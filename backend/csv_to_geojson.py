@@ -1,6 +1,9 @@
 import csv
+csv.field_size_limit(1000000)  # Increase field size limit
 import json
+import sys
 from datetime import datetime
+import math
 
 def determine_season(date_str):
     try:
@@ -17,8 +20,20 @@ def determine_season(date_str):
     except:
         return "Spring"  # default
 
+def distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
+def approx_area(min_lon, max_lon, min_lat, max_lat):
+    # Approximate area in square km
+    lat_diff = max_lat - min_lat
+    lon_diff = max_lon - min_lon
+    avg_lat = (min_lat + max_lat) / 2
+    # 1 degree lat ≈ 111 km, lon ≈ 111 * cos(lat) km
+    area = lat_diff * 111 * lon_diff * 111 * math.cos(math.radians(avg_lat))
+    return area
+
 def csv_to_geojson(csv_file_path):
-    features = []
+    points = []
     
     with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -26,41 +41,73 @@ def csv_to_geojson(csv_file_path):
             try:
                 lat = float(row['latitude'])
                 lon = float(row['longitude'])
-                
-                # Create a small square around the point (0.01 degrees ~ 1km)
-                size = 0.005  # half size in degrees
-                square_coords = [
-                    [lon - size, lat - size],
-                    [lon + size, lat - size],
-                    [lon + size, lat + size],
-                    [lon - size, lat + size],
-                    [lon - size, lat - size]  # close the polygon
-                ]
-                
-                properties = {
-                    "id": None,
-                    "Site": row['scientificName'],
-                    "Family": row['family'],
-                    "Genus": row['genus'],
-                    "Season": determine_season(row['date']),
-                    "Area": 1.0  # Approximate area for the square
-                }
-                
-                geometry = {
-                    "type": "MultiPolygon",
-                    "coordinates": [[square_coords]]
-                }
-                
-                feature = {
-                    "type": "Feature",
-                    "properties": properties,
-                    "geometry": geometry
-                }
-                
-                features.append(feature)
+                season = determine_season(row['date'])
+                points.append((lon, lat, row['scientificName'], row['family'], row['genus'], season))
             except (ValueError, KeyError):
-                # Skip rows with invalid data
                 continue
+    
+    # Simple clustering: group points within 0.1 degrees
+    threshold = 0.1
+    clusters = []
+    for point in points:
+        found = False
+        for cluster in clusters:
+            if any(distance(point[:2], p[:2]) < threshold for p in cluster):
+                cluster.append(point)
+                found = True
+                break
+        if not found:
+            clusters.append([point])
+    
+    features = []
+    for cluster in clusters:
+        if not cluster:
+            continue
+        lons = [p[0] for p in cluster]
+        lats = [p[1] for p in cluster]
+        min_lon, max_lon = min(lons), max(lons)
+        min_lat, max_lat = min(lats), max(lats)
+        
+        # Expand the bounding box based on number of points
+        margin = 0.01 * (len(cluster) ** 0.5)
+        min_lon -= margin
+        max_lon += margin
+        min_lat -= margin
+        max_lat += margin
+        
+        # Create a rectangle polygon
+        square_coords = [
+            [min_lon, min_lat],
+            [max_lon, min_lat],
+            [max_lon, max_lat],
+            [min_lon, max_lat],
+            [min_lon, min_lat]  # close
+        ]
+        
+        # Use the first point's properties
+        first = cluster[0]
+        area = approx_area(min_lon, max_lon, min_lat, max_lat)
+        properties = {
+            "id": None,
+            "Site": first[2],  # scientificName
+            "Family": first[3],
+            "Genus": first[4],
+            "Season": first[5],
+            "Area": area  # Approximate area in square km
+        }
+        
+        geometry = {
+            "type": "MultiPolygon",
+            "coordinates": [[square_coords]]
+        }
+        
+        feature = {
+            "type": "Feature",
+            "properties": properties,
+            "geometry": geometry
+        }
+        
+        features.append(feature)
     
     geojson = {
         "type": "FeatureCollection",
