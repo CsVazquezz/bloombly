@@ -380,8 +380,9 @@ class EnhancedBloomPredictor:
             historical_mean_day = species_info.get('mean_day', target_day)
 
             # Calculate bloom probability based on environmental suitability
-            day_diff_penalty = 1 - min(1, abs(target_day - historical_mean_day) / 60)
-            environmental_factor = np.clip(best_species_prob * day_diff_penalty, 0, 1)
+            # For future predictions, focus on environmental conditions rather than historical timing
+            # Use species probability as base, then modulate by environmental suitability
+            environmental_factor = best_species_prob  # Start with species probability
 
             # Temperature suitability (species-specific)
             temp_suitability = self.calculate_temperature_suitability(
@@ -393,8 +394,19 @@ class EnhancedBloomPredictor:
                 env_data['precipitation'], target_month
             )
 
+            # NDVI suitability (vegetation health indicator)
+            ndvi_suitability = max(0.1, min(1.0, env_data['ndvi'] / 0.8))  # NDVI > 0.8 is very healthy
+
+            # Seasonal timing factor (gentle preference for historical season)
+            seasonal_alignment = 1 - min(1, abs(target_day - historical_mean_day) / 120)  # More lenient: 120 days
+            seasonal_factor = 0.7 + 0.3 * seasonal_alignment  # Base 0.7, up to 1.0
+
             # Combined probability
-            bloom_probability = environmental_factor * temp_suitability * precip_suitability
+            bloom_probability = (environmental_factor *
+                               temp_suitability *
+                               precip_suitability *
+                               ndvi_suitability *
+                               seasonal_factor)
 
             if bloom_probability > 0.01:  # Lower threshold for testing
                 # Get species details
