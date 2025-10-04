@@ -107,6 +107,20 @@
       <button id="toggleRingsBtn">Toggle Rings</button>
       <button id="toggleModeBtn">Switch to Points</button>
     </div>
+      <div class="filter-section">
+        <h4>Area of Interest (AOI)</h4>
+        <label>Type:
+          <select id="aoiTypeSelect">
+            <option value="global">Global</option>
+            <option value="country">Country</option>
+            <option value="state">State</option>
+          </select>
+        </label>
+        <label>Country: <input type="text" id="aoiCountryInput" placeholder="e.g. United States, Mexico"></label>
+        <label>State: <input type="text" id="aoiStateInput" placeholder="e.g. Texas"></label>
+        <label>Date: <input type="date" id="dateInput" value="2024-07-01"></label>
+        <button id="applyAoiBtn">Apply AOI</button>
+      </div>
     <div id="filters">
       <div class="filter-section">
         <h4>Filter by Season</h4>
@@ -133,7 +147,8 @@
     // ============================================================================
     // CONSTANTS
     // ============================================================================
-    const GEOJSON_FILES = ['output.geojson', 'pyrus.geojson','cactacae.geojson'];
+    // const GEOJSON_FILES = ['output.geojson', 'pyrus.geojson','cactacae.geojson']; // Fallback files
+    const API_BASE_URL = 'http://localhost:5001/api';
     const CLOUDS_IMAGE_URL = './clouds.png';
     const EARTH_IMAGE_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
     const EARTH_TOPOLOGY_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
@@ -424,6 +439,37 @@
     // DATA LOADING
     // ============================================================================
     function loadGeoJSONData() {
+      // Fetch bloom data from API
+      fetch(`${API_BASE_URL}/blooms?aoi_type=global&date=2024-07-01`)
+        .then(response => response.json())
+        .then(data => {
+          const allFeatures = data.features.filter(feature => 
+            feature.properties.Family && feature.properties.Genus && feature.properties.Season
+          );
+          state.geojsonFeatures = allFeatures;
+          state.pointsData = allFeatures.map(createPointFromFeature);
+          
+          // Populate all families and genus
+          state.allFamilies = new Set(allFeatures.map(f => f.properties.Family));
+          state.allGenus = new Set(allFeatures.map(f => f.properties.Genus));
+          state.selectedFamilies = new Set(state.allFamilies);
+          state.selectedGenus = new Set(state.allGenus);
+          
+          // Initial filter
+          applyFilters();
+          
+          createFilterUI();
+          updateLegend();
+        })
+        .catch(error => {
+          console.error('Error loading bloom data from API:', error);
+          // Fallback to static files if API fails
+          console.log('Falling back to static GeoJSON files...');
+          loadStaticGeoJSON();
+        });
+    }
+
+    function loadStaticGeoJSON() {
       Promise.all(GEOJSON_FILES.map(file => fetch(file).then(response => response.json())))
         .then(datas => {
           const allFeatures = datas.flatMap(data => data.features).filter(feature => 
@@ -547,6 +593,60 @@
     document.getElementById('genusCheckboxes').addEventListener('change', handleGenusCheckboxChange);
     document.getElementById('familySearch').addEventListener('input', handleFamilySearch);
     document.getElementById('genusSearch').addEventListener('input', handleGenusSearch);
+    document.getElementById('applyAoiBtn').addEventListener('click', function() {
+      const aoiType = document.getElementById('aoiTypeSelect').value;
+      const aoiCountry = document.getElementById('aoiCountryInput').value.trim();
+      const aoiState = document.getElementById('aoiStateInput').value.trim();
+      const date = document.getElementById('dateInput').value;
+
+      console.log('AOI Button clicked:', { aoiType, aoiCountry, aoiState, date });
+
+      // Build query string
+      const qs = new URLSearchParams({
+        aoi_type: aoiType,
+        aoi_country: aoiCountry,
+        aoi_state: aoiState,
+        date: date
+      }).toString();
+
+      const apiUrl = `${API_BASE_URL}/blooms?` + qs;
+      console.log('Fetching from:', apiUrl);
+
+      fetch(apiUrl)
+        .then(r => {
+          console.log('API Response status:', r.status);
+          return r.json();
+        })
+        .then(data => {
+          console.log('API Response data:', data);
+          console.log('Number of features:', data.features ? data.features.length : 0);
+
+          const allFeatures = (data.features || []).filter(feature => {
+            const hasProps = feature.properties && feature.properties.Family && feature.properties.Genus && feature.properties.Season;
+            console.log('Feature properties:', feature.properties, 'Has required props:', hasProps);
+            return hasProps;
+          });
+
+          console.log('Filtered features count:', allFeatures.length);
+
+          state.geojsonFeatures = allFeatures;
+          state.pointsData = allFeatures.map(createPointFromFeature);
+          state.allFamilies = new Set(allFeatures.map(f => f.properties.Family));
+          state.allGenus = new Set(allFeatures.map(f => f.properties.Genus));
+          state.selectedFamilies = new Set(state.allFamilies);
+          state.selectedGenus = new Set(state.allGenus);
+
+          console.log('Updating globe with features...');
+          applyFilters();
+          createFilterUI();
+
+          console.log('Globe update complete');
+        })
+        .catch(err => {
+          console.error('AOI fetch failed:', err);
+          loadStaticGeoJSON();
+        });
+    });
 
     // ============================================================================
     // INITIALIZATION
