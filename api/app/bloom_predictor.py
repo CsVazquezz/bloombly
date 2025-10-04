@@ -396,7 +396,7 @@ class EnhancedBloomPredictor:
             # Combined probability
             bloom_probability = environmental_factor * temp_suitability * precip_suitability
 
-            if bloom_probability > 0.1:  # Threshold for bloom occurrence
+            if bloom_probability > 0.01:  # Lower threshold for testing
                 # Get species details
                 species_row = self.historical_data[
                     self.historical_data['scientificName'] == species_name
