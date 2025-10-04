@@ -1,23 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <style> body { margin: 0; } </style>
-
-  <script src="//cdn.jsdelivr.net/npm/globe.gl"></script>
-  <!--<script src="../../dist/globe.gl.js"></script>-->
+  <meta charset="UTF-8">
+  <title>GLOBE Observer Bloom Events</title>
+  <style>
+    body { margin: 0; }
+    #globeViz { width: 100vw; height: 100vh; }
+    #legend {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    }
+    .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+    .color-box { width: 15px; height: 15px; margin-right: 5px; }
+    button { margin-right: 5px; margin-bottom: 10px; }
+  </style>
 </head>
-
 <body>
   <div id="globeViz"></div>
+  <div id="legend">
+    <button id="colorBySeason">Color by Season</button>
+    <button id="colorByType">Color by Type</button>
+    <div id="legendContent">
+      <div class="legend-item">
+        <div class="color-box" style="background-color: #00ff00;"></div>
+        <span>Spring</span>
+      </div>
+      <div class="legend-item">
+        <div class="color-box" style="background-color: #ffa500;"></div>
+        <span>Spring to Summer</span>
+      </div>
+      <div class="legend-item">
+        <div class="color-box" style="background-color: #ffff00;"></div>
+        <span>Summer</span>
+      </div>
+    </div>
+  </div>
 
-  <script type="module">
-    import * as THREE from 'https://esm.sh/three';
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+  <!-- Globe.gl -->
+  <script src="https://unpkg.com/globe.gl"></script>
 
-    const world = new Globe(document.getElementById('globeViz'), { animateIn: false })
+  <script>
+    let pointsData = [];
+    let colorMode = 'season'; // default
+
+
+    const globe = new Globe(document.getElementById('globeViz'), { animateIn: false })
       .globeImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg')
-      .bumpImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png');
+      .bumpImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png').pointOfView({lat: 37, lng: -95, altitude: 2})
+      .pointsData([])  // load later
+      .pointAltitude(0.001)
+      .pointColor(getPointColor)
+      .pointRadius(pt => pt.Area * 0.000001)
+      .ringsData([])  // load later
+      .ringColor(getPointColor)
+      .ringMaxRadius('maxR')
+      .ringPropagationSpeed('propagationSpeed')
+      .ringRepeatPeriod('repeatPeriod')
+      .onPointClick(pt => {
+        alert(`Site: ${pt.Site}\nType: ${pt.Type}\nSeason: ${pt.Season}\nArea: ${pt.Area}`);
+      });;
 
     // Auto-rotate
-    world.controls().autoRotate = true;
-    world.controls().autoRotateSpeed = 0.35;
+    globe.controls().autoRotate = false;
+    globe.controls().autoRotateSpeed = 0.35;
 
     // Add clouds sphere
     const CLOUDS_IMG_URL = './clouds.png'; // from https://github.com/turban/webgl-earth
@@ -26,15 +79,98 @@
 
     new THREE.TextureLoader().load(CLOUDS_IMG_URL, cloudsTexture => {
       const clouds = new THREE.Mesh(
-        new THREE.SphereGeometry(world.getGlobeRadius() * (1 + CLOUDS_ALT), 75, 75),
+        new THREE.SphereGeometry(globe.getGlobeRadius() * (1 + CLOUDS_ALT), 75, 75),
         new THREE.MeshPhongMaterial({ map: cloudsTexture, transparent: true })
       );
-      world.scene().add(clouds);
+      globe.scene().add(clouds);
 
       (function rotateClouds() {
         clouds.rotation.y += CLOUDS_ROTATION_SPEED * Math.PI / 180;
         requestAnimationFrame(rotateClouds);
       })();
     });
+
+    function getPointColor(pt) {
+      if (colorMode === 'season') {
+        if (pt.Season === 'Spring') return '#00ff00';
+        if (pt.Season === 'Summer') return '#ffff00';
+        if (pt.Season === 'Spring to Summer') return '#ffa500';
+      } else if (colorMode === 'type') {
+        return pt.Type === 'Wild' ? '#ff7800' : '#0000ff';
+      }
+      return '#ff7800'; // default
+    }
+
+    function updateLegend() {
+      const legendContent = document.getElementById('legendContent');
+      if (colorMode === 'season') {
+        legendContent.innerHTML = `
+          <div class="legend-item">
+            <div class="color-box" style="background-color: #00ff00;"></div>
+            <span>Spring</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box" style="background-color: #ffa500;"></div>
+            <span>Spring to Summer</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box" style="background-color: #ffff00;"></div>
+            <span>Summer</span>
+          </div>
+        `;
+      } else {
+        legendContent.innerHTML = `
+          <div class="legend-item">
+            <div class="color-box" style="background-color: #ff7800;"></div>
+            <span>Wild</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box" style="background-color: #0000ff;"></div>
+            <span>Plantation</span>
+          </div>
+        `;
+      }
+    }
+
+    // Load GeoJSON
+    fetch('WildflowerBlooms_AreaOfInterest.geojson')
+      .then(res => res.json())
+      .then(data => {
+        // Convert MultiPolygons to center points
+        pointsData = data.features.map(f => {
+          const coords = f.geometry.coordinates[0][0]; // take first polygon's first ring
+          let latSum = 0, lngSum = 0;
+          coords.forEach(c => { lngSum += c[0]; latSum += c[1]; });
+          const n = coords.length;
+          return {
+            lat: latSum / n,
+            lng: lngSum / n,
+            Site: f.properties.Site,
+            Type: f.properties.Type,
+            Season: f.properties.Season,
+            Area: f.properties.Area,
+            maxR: f.properties.Area * 0.000003 + 0.3, // scale ring radius with area
+            propagationSpeed: 0.3,
+            repeatPeriod: 1000
+          };
+        });
+
+        globe.pointsData(pointsData);
+        globe.ringsData(pointsData);
+        updateLegend();
+      });
+
+    document.getElementById('colorBySeason').addEventListener('click', () => {
+      colorMode = 'season';
+      globe.pointColor(getPointColor);
+      updateLegend();
+    });
+
+    document.getElementById('colorByType').addEventListener('click', () => {
+      colorMode = 'type';
+      globe.pointColor(getPointColor);
+      updateLegend();
+    });
   </script>
 </body>
+</html>
