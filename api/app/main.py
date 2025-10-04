@@ -6,6 +6,7 @@ import os
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from routes.data import data_bp
+from routes.predict import predict_bp
 
 # Load environment variables from .env file
 load_dotenv()
@@ -58,6 +59,7 @@ def initialize_earth_engine():
 initialize_earth_engine()
 
 app.register_blueprint(data_bp, url_prefix='/api')
+app.register_blueprint(predict_bp, url_prefix='/api')
 
 @app.route('/')
 def hello():
