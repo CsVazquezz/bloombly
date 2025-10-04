@@ -104,6 +104,7 @@
   <div id="legend">
     <div class="control-buttons">
       <button id="toggleCloudsBtn">Toggle Clouds</button>
+      <button id="toggleRingsBtn">Toggle Rings</button>
       <button id="toggleModeBtn">Switch to Points</button>
     </div>
     <div id="filters">
@@ -132,7 +133,7 @@
     // ============================================================================
     // CONSTANTS
     // ============================================================================
-    const GEOJSON_FILE = 'output.geojson';
+    const GEOJSON_FILES = ['output.geojson', 'pyrus.geojson','cactacae.geojson'];
     const CLOUDS_IMAGE_URL = './clouds.png';
     const EARTH_IMAGE_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
     const EARTH_TOPOLOGY_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
@@ -140,14 +141,14 @@
     const CLOUDS_ALTITUDE = 0.004;
     const CLOUDS_ROTATION_SPEED = -0.006; // degrees per frame
     
-    const HEX_POLYGON_RESOLUTION = 5;
+    const HEX_POLYGON_RESOLUTION = 6;
     const HEX_POLYGON_MARGIN = 0.3;
     
     const POINT_AREA_SCALE = 0.0000005;
-    const POINT_BASE_RADIUS = 0.05;
+    const POINT_BASE_RADIUS = 0.03;
     const RING_AREA_SCALE = 0.000003;
     const RING_BASE_RADIUS = 0.3;
-    const RING_PROPAGATION_SPEED = 0.3;
+    const RING_PROPAGATION_SPEED = 0.1;
     const RING_REPEAT_PERIOD = 1000;
     
     const COLOR_MODE = {
@@ -183,6 +184,7 @@
       currentColorMode: COLOR_MODE.SEASON,
       currentDisplayMode: DISPLAY_MODE.HEX,
       cloudsMesh: null,
+      ringsEnabled: true,
       allFamilies: new Set(),
       allGenus: new Set(),
       selectedSeasons: new Set(['Spring', 'Summer', 'Fall', 'Winter']),
@@ -367,7 +369,7 @@
     function switchToPointsMode() {
       globe.pointsData(state.filteredPoints);
       globe.hexPolygonsData([]);
-      globe.ringsData(state.filteredPoints);
+      globe.ringsData(state.ringsEnabled ? state.filteredPoints : []);
       document.getElementById('toggleModeBtn').textContent = 'Switch to Hex Polygons';
     }
     
@@ -422,15 +424,17 @@
     // DATA LOADING
     // ============================================================================
     function loadGeoJSONData() {
-      fetch(GEOJSON_FILE)
-        .then(response => response.json())
-        .then(data => {
-          state.geojsonFeatures = data.features;
-          state.pointsData = data.features.map(createPointFromFeature);
+      Promise.all(GEOJSON_FILES.map(file => fetch(file).then(response => response.json())))
+        .then(datas => {
+          const allFeatures = datas.flatMap(data => data.features).filter(feature => 
+            feature.properties.Family && feature.properties.Genus && feature.properties.Season
+          );
+          state.geojsonFeatures = allFeatures;
+          state.pointsData = allFeatures.map(createPointFromFeature);
           
           // Populate all families and genus
-          state.allFamilies = new Set(data.features.map(f => f.properties.Family));
-          state.allGenus = new Set(data.features.map(f => f.properties.Genus));
+          state.allFamilies = new Set(allFeatures.map(f => f.properties.Family));
+          state.allGenus = new Set(allFeatures.map(f => f.properties.Genus));
           state.selectedFamilies = new Set(state.allFamilies);
           state.selectedGenus = new Set(state.allGenus);
           
@@ -521,11 +525,20 @@
       }
       refreshGlobeColors();
     }
+    
+    function handleToggleRingsClick() {
+      state.ringsEnabled = !state.ringsEnabled;
+      if (state.currentDisplayMode === DISPLAY_MODE.POINTS) {
+        globe.ringsData(state.ringsEnabled ? state.filteredPoints : []);
+        refreshGlobeColors();
+      }
+    }
 
     // ============================================================================
     // EVENT LISTENERS
     // ============================================================================
     document.getElementById('toggleCloudsBtn').addEventListener('click', toggleCloudsVisibility);
+    document.getElementById('toggleRingsBtn').addEventListener('click', handleToggleRingsClick);
     document.getElementById('toggleModeBtn').addEventListener('click', handleToggleModeClick);
     
     // Filter listeners
