@@ -1,0 +1,160 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Azure Functions
+local.settings.json
+__blobstorage__/
+__queues__/
+__azurite_db*__.json
+.python_packages/
+.venv/
+env/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+
+# Data files - Keep CSVs for direct processing, ignore large archives
+data-processing/raw/*.zip
+data-processing/raw/*.tar.gz
+data-processing/processed/
+# Allow CSV datasets to be committed for hackathon demo
+# *.csv - commented out so datasets are included
+# *.xlsx - commented out so datasets are included
+!WildflowerBlooms_AreaOfInterest.geojson
+
+# Machine Learning
+ml-models/notebooks/.ipynb_checkpoints/
+ml-models/trained-models/
+*.pkl
+*.h5
+*.model
+*.onnx
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.secret
+
+# API Keys and Credentials
+secrets/
+credentials/
+*-credentials.json
+service-account*.json
+
+# IDE and Editor
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Azure
+.azure/
+*.publishsettings
+*.azurePubxml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+.grunt
+.lock-wscript
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Build outputs
+dist/
+.cache/
+.parcel-cache/
+out/
+
+# Database files (if using SQLite locally)
+*.db
+*.sqlite
+*.sqlite3
+
+# Compressed files (unless needed)
+*.zip
+*.tar.gz
+*.rar
+
+# Large dataset archives
+*.7z
+data-archives/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Azure Storage Emulator
+__blobstorage__/
+__queues__/
+__azurite_db*.json
+
+# Terraform (if using)
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.*
+infrastructure/terraform/.terraform.lock.hcl
+
+# Generated files
+staticwebapp.config.json.backup
