@@ -61,6 +61,41 @@
       border-radius: 2px;
       border: 1px solid rgba(0, 0, 0, 0.2);
     }
+    
+    .filter-section {
+      margin-bottom: 15px;
+    }
+    
+    .filter-section h4 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+    }
+    
+    .checkbox-item input {
+      margin-right: 5px;
+    }
+    
+    #speciesSearch {
+      width: 100%;
+      padding: 5px;
+      font-size: 11px;
+      margin-bottom: 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
@@ -68,10 +103,24 @@
   
   <div id="legend">
     <div class="control-buttons">
-      <button id="colorBySeasonBtn">Color by Season</button>
-      <button id="colorByTypeBtn">Color by Type</button>
       <button id="toggleCloudsBtn">Toggle Clouds</button>
       <button id="toggleModeBtn">Switch to Points</button>
+    </div>
+    <div id="filters">
+      <div class="filter-section">
+        <h4>Filter by Season</h4>
+        <div id="seasonCheckboxes"></div>
+      </div>
+      <div class="filter-section">
+        <h4>Filter by Family</h4>
+        <input type="text" id="familySearch" placeholder="Search families...">
+        <div id="familyCheckboxes"></div>
+      </div>
+      <div class="filter-section">
+        <h4>Filter by Genus</h4>
+        <input type="text" id="genusSearch" placeholder="Search genus...">
+        <div id="genusCheckboxes"></div>
+      </div>
     </div>
     <div id="legendContent"></div>
   </div>
@@ -83,7 +132,7 @@
     // ============================================================================
     // CONSTANTS
     // ============================================================================
-    const GEOJSON_FILE = 'WildflowerBlooms_AreaOfInterest.geojson';
+    const GEOJSON_FILE = 'output.geojson';
     const CLOUDS_IMAGE_URL = './clouds.png';
     const EARTH_IMAGE_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
     const EARTH_TOPOLOGY_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
@@ -102,8 +151,7 @@
     const RING_REPEAT_PERIOD = 1000;
     
     const COLOR_MODE = {
-      SEASON: 'season',
-      TYPE: 'type'
+      SEASON: 'season'
     };
     
     const DISPLAY_MODE = {
@@ -114,12 +162,8 @@
     const SEASON_COLORS = {
       'Spring': '#ff00ff',
       'Summer': '#ff0000',
-      'Spring to Summer': '#ff7f00'
-    };
-    
-    const TYPE_COLORS = {
-      'Wild': '#ff7800',
-      'Plantation': '#0000ff'
+      'Fall': '#ffa500',
+      'Winter': '#0000ff'
     };
     
     const DEFAULT_COLOR = '#ff7800';
@@ -138,7 +182,14 @@
       pointsData: [],
       currentColorMode: COLOR_MODE.SEASON,
       currentDisplayMode: DISPLAY_MODE.HEX,
-      cloudsMesh: null
+      cloudsMesh: null,
+      allFamilies: new Set(),
+      allGenus: new Set(),
+      selectedSeasons: new Set(['Spring', 'Summer', 'Fall', 'Winter']),
+      selectedFamilies: new Set(),
+      selectedGenus: new Set(),
+      filteredFeatures: [],
+      filteredPoints: []
     };
 
     // ============================================================================
@@ -174,8 +225,6 @@
     function getColorForFeature(feature) {
       if (state.currentColorMode === COLOR_MODE.SEASON) {
         return SEASON_COLORS[feature.Season] || DEFAULT_COLOR;
-      } else if (state.currentColorMode === COLOR_MODE.TYPE) {
-        return TYPE_COLORS[feature.Type] || DEFAULT_COLOR;
       }
       return DEFAULT_COLOR;
     }
@@ -213,7 +262,8 @@
         lat: center.lat,
         lng: center.lng,
         Site: properties.Site,
-        Type: properties.Type,
+        Family: properties.Family,
+        Genus: properties.Genus,
         Season: properties.Season,
         Area: properties.Area,
         maxR: properties.Area * RING_AREA_SCALE + RING_BASE_RADIUS,
@@ -228,7 +278,8 @@
     function createHexPolygonLabel({ properties: data }) {
       return `
         <b>${data.Site}</b><br/>
-        Type: <i>${data.Type}</i><br/>
+        Family: <i>${data.Family}</i><br/>
+        Genus: <i>${data.Genus}</i><br/>
         Season: <i>${data.Season}</i><br/>
         Area: <i>${data.Area}</i>
       `;
@@ -244,42 +295,79 @@
             <span>Spring</span>
           </div>
           <div class="legend-item">
-            <div class="color-box" style="background-color: ${SEASON_COLORS['Spring to Summer']};"></div>
-            <span>Spring to Summer</span>
-          </div>
-          <div class="legend-item">
             <div class="color-box" style="background-color: ${SEASON_COLORS['Summer']};"></div>
             <span>Summer</span>
           </div>
-        `;
-      } else {
-        legendContent.innerHTML = `
           <div class="legend-item">
-            <div class="color-box" style="background-color: ${TYPE_COLORS['Wild']};"></div>
-            <span>Wild</span>
+            <div class="color-box" style="background-color: ${SEASON_COLORS['Fall']};"></div>
+            <span>Fall</span>
           </div>
           <div class="legend-item">
-            <div class="color-box" style="background-color: ${TYPE_COLORS['Plantation']};"></div>
-            <span>Plantation</span>
+            <div class="color-box" style="background-color: ${SEASON_COLORS['Winter']};"></div>
+            <span>Winter</span>
           </div>
         `;
       }
+    }
+
+    function createFilterUI() {
+      // Season checkboxes
+      const seasonCheckboxes = document.getElementById('seasonCheckboxes');
+      const seasons = ['Spring', 'Summer', 'Fall', 'Winter'];
+      seasonCheckboxes.innerHTML = seasons.map(season => `
+        <label class="checkbox-item">
+          <input type="checkbox" value="${season}" ${state.selectedSeasons.has(season) ? 'checked' : ''}>
+          ${season}
+        </label>
+      `).join('');
+      
+      // Family checkboxes
+      updateFamilyCheckboxes();
+      
+      // Genus checkboxes
+      updateGenusCheckboxes();
+    }
+    
+    function updateFamilyCheckboxes(searchTerm = '') {
+      const familyCheckboxes = document.getElementById('familyCheckboxes');
+      const filteredFamilies = Array.from(state.allFamilies).filter(family => 
+        family.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      familyCheckboxes.innerHTML = filteredFamilies.map(family => `
+        <label class="checkbox-item">
+          <input type="checkbox" value="${family}" ${state.selectedFamilies.has(family) ? 'checked' : ''}>
+          ${family}
+        </label>
+      `).join('');
+    }
+    
+    function updateGenusCheckboxes(searchTerm = '') {
+      const genusCheckboxes = document.getElementById('genusCheckboxes');
+      const filteredGenus = Array.from(state.allGenus).filter(genus => 
+        genus.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      genusCheckboxes.innerHTML = filteredGenus.map(genus => `
+        <label class="checkbox-item">
+          <input type="checkbox" value="${genus}" ${state.selectedGenus.has(genus) ? 'checked' : ''}>
+          ${genus}
+        </label>
+      `).join('');
     }
 
     // ============================================================================
     // DISPLAY MODE FUNCTIONS
     // ============================================================================
     function switchToHexMode() {
-      globe.hexPolygonsData(state.geojsonFeatures);
+      globe.hexPolygonsData(state.filteredFeatures);
       globe.pointsData([]);
       globe.ringsData([]);
       document.getElementById('toggleModeBtn').textContent = 'Switch to Points';
     }
     
     function switchToPointsMode() {
-      globe.pointsData(state.pointsData);
+      globe.pointsData(state.filteredPoints);
       globe.hexPolygonsData([]);
-      globe.ringsData(state.pointsData);
+      globe.ringsData(state.filteredPoints);
       document.getElementById('toggleModeBtn').textContent = 'Switch to Hex Polygons';
     }
     
@@ -340,8 +428,16 @@
           state.geojsonFeatures = data.features;
           state.pointsData = data.features.map(createPointFromFeature);
           
-          // Initialize with hex mode
-          switchToHexMode();
+          // Populate all families and genus
+          state.allFamilies = new Set(data.features.map(f => f.properties.Family));
+          state.allGenus = new Set(data.features.map(f => f.properties.Genus));
+          state.selectedFamilies = new Set(state.allFamilies);
+          state.selectedGenus = new Set(state.allGenus);
+          
+          // Initial filter
+          applyFilters();
+          
+          createFilterUI();
           updateLegend();
         })
         .catch(error => {
@@ -350,18 +446,69 @@
     }
 
     // ============================================================================
+    // FILTERING FUNCTIONS
+    // ============================================================================
+    function applyFilters() {
+      state.filteredFeatures = state.geojsonFeatures.filter(feature => {
+        const season = feature.properties.Season;
+        const family = feature.properties.Family;
+        const genus = feature.properties.Genus;
+        return state.selectedSeasons.has(season) && state.selectedFamilies.has(family) && state.selectedGenus.has(genus);
+      });
+      state.filteredPoints = state.pointsData.filter(point => {
+        const season = point.Season;
+        const family = point.Family;
+        const genus = point.Genus;
+        return state.selectedSeasons.has(season) && state.selectedFamilies.has(family) && state.selectedGenus.has(genus);
+      });
+      
+      // Update display
+      if (state.currentDisplayMode === DISPLAY_MODE.HEX) {
+        switchToHexMode();
+      } else {
+        switchToPointsMode();
+      }
+    }
+
+    // ============================================================================
     // EVENT HANDLERS
     // ============================================================================
-    function handleColorBySeasonClick() {
-      state.currentColorMode = COLOR_MODE.SEASON;
-      refreshGlobeColors();
-      updateLegend();
+    function handleSeasonCheckboxChange(event) {
+      const season = event.target.value;
+      if (event.target.checked) {
+        state.selectedSeasons.add(season);
+      } else {
+        state.selectedSeasons.delete(season);
+      }
+      applyFilters();
     }
     
-    function handleColorByTypeClick() {
-      state.currentColorMode = COLOR_MODE.TYPE;
-      refreshGlobeColors();
-      updateLegend();
+    function handleFamilyCheckboxChange(event) {
+      const family = event.target.value;
+      if (event.target.checked) {
+        state.selectedFamilies.add(family);
+      } else {
+        state.selectedFamilies.delete(family);
+      }
+      applyFilters();
+    }
+    
+    function handleGenusCheckboxChange(event) {
+      const genus = event.target.value;
+      if (event.target.checked) {
+        state.selectedGenus.add(genus);
+      } else {
+        state.selectedGenus.delete(genus);
+      }
+      applyFilters();
+    }
+    
+    function handleFamilySearch(event) {
+      updateFamilyCheckboxes(event.target.value);
+    }
+    
+    function handleGenusSearch(event) {
+      updateGenusCheckboxes(event.target.value);
     }
     
     function handleToggleModeClick() {
@@ -378,10 +525,15 @@
     // ============================================================================
     // EVENT LISTENERS
     // ============================================================================
-    document.getElementById('colorBySeasonBtn').addEventListener('click', handleColorBySeasonClick);
-    document.getElementById('colorByTypeBtn').addEventListener('click', handleColorByTypeClick);
     document.getElementById('toggleCloudsBtn').addEventListener('click', toggleCloudsVisibility);
     document.getElementById('toggleModeBtn').addEventListener('click', handleToggleModeClick);
+    
+    // Filter listeners
+    document.getElementById('seasonCheckboxes').addEventListener('change', handleSeasonCheckboxChange);
+    document.getElementById('familyCheckboxes').addEventListener('change', handleFamilyCheckboxChange);
+    document.getElementById('genusCheckboxes').addEventListener('change', handleGenusCheckboxChange);
+    document.getElementById('familySearch').addEventListener('input', handleFamilySearch);
+    document.getElementById('genusSearch').addEventListener('input', handleGenusSearch);
 
     // ============================================================================
     // INITIALIZATION
