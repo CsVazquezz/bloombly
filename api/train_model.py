@@ -162,6 +162,42 @@ Examples:
         help='Path to bloom observation CSV file (default: ../backend/data.csv)'
     )
     
+    parser.add_argument(
+        '--output',
+        type=str,
+        default='app/bloom_model_v2.pkl',
+        help='Path where trained model will be saved (default: app/bloom_model_v2.pkl)'
+    )
+    
+    parser.add_argument(
+        '--use_earth_engine',
+        action='store_true',
+        help='Use Google Earth Engine for environmental data (requires authentication)'
+    )
+    
+    parser.add_argument(
+        '--n_estimators',
+        type=int,
+        default=200,
+        help='Number of boosting stages (trees) in the model (default: 200)'
+    )
+    
+    parser.add_argument(
+        '--max_depth',
+        type=int,
+        default=5,
+        help='Maximum depth of each tree (default: 5)'
+    )
+    
+    parser.add_argument(
+        '--learning_rate',
+        type=float,
+        default=0.05,
+        help='Learning rate for gradient boosting (default: 0.05)'
+    )
+    
+    args = parser.parse_args()
+    
     try:
         predictor = train_and_save_model(
             data_path=args.data,
