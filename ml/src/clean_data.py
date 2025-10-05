@@ -164,6 +164,166 @@ class BloomDataCleaner:
         
         return cleaned
     
+    def clean_historical_sakura_data(self, sakura_bloom_path, cities_geocoded_path):
+        """
+        Clean historical Japanese cherry blossom data (1953-2025).
+        Combines JMA observation data with geocoded city coordinates.
+        
+        Args:
+            sakura_bloom_path: Path to sakura_first_bloom_dates.csv
+            cities_geocoded_path: Path to japan_cities_geocoded.csv
+            
+        Returns:
+            pandas DataFrame with cleaned historical cherry blossom data
+        """
+        print(f"\n Processing Historical Japanese Sakura Data (1953-2025)...")
+        print(f" Reading bloom dates from: {sakura_bloom_path}")
+        print(f" Reading geocoded cities from: {cities_geocoded_path}")
+
+        # Load bloom dates and geocoded cities
+        blooms = pd.read_csv(sakura_bloom_path)
+        cities = pd.read_csv(cities_geocoded_path)
+        
+        print(f" Cities: {len(blooms)} locations")
+        print(f" Geocoded cities: {len(cities)} with coordinates")
+        
+        # Create a dictionary mapping city names to their coordinates
+        city_lookup = cities.set_index('city_name').to_dict('index')
+        
+        # Prepare data for transformation
+        records = []
+        
+        # Get year columns (exclude first 2 columns: Site Name, Currently Being Observed)
+        # and last 2 columns: 30 Year Average, Notes
+        year_columns = blooms.columns[2:-2]
+        
+        print(f" Processing bloom dates from {len(year_columns)} years...")
+        
+        for idx, row in blooms.iterrows():
+            city_name = row['Site Name']
+            currently_observed = row['Currently Being Observed']
+            notes = row.get('Notes', '') if pd.notna(row.get('Notes', '')) else ''
+            
+            # Get city coordinates
+            city_info = city_lookup.get(city_name, {})
+            latitude = city_info.get('latitude')
+            longitude = city_info.get('longitude')
+            elevation = city_info.get('elevation_m')
+            
+            if latitude is None or longitude is None:
+                print(f"   Warning: No coordinates for {city_name}, skipping...")
+                continue
+            
+            # Determine species from notes
+            if 'Sargent cherry' in notes or 'Prunus sargentii' in notes:
+                species_name = 'Prunus sargentii'
+                common_name = 'Sargent Cherry'
+                species_code = 'sargentii'
+            elif 'Taiwan cherry' in notes or 'Prunus campanulata' in notes:
+                species_name = 'Prunus campanulata'
+                common_name = 'Taiwan Cherry'
+                species_code = 'campanulata'
+            elif 'Kurile' in notes or 'kurilensis' in notes:
+                species_name = 'Cerasus nipponica var. kurilensis'
+                common_name = 'Kurile Island Cherry'
+                species_code = 'kurilensis'
+            else:
+                # Default to Yoshino (most common)
+                species_name = 'Prunus × yedoensis'
+                common_name = 'Yoshino Cherry'
+                species_code = 'yedoensis'
+            
+            # Process each year's bloom date
+            for year_col in year_columns:
+                bloom_date_str = row[year_col]
+                
+                # Skip empty/NaN values
+                if pd.isna(bloom_date_str) or bloom_date_str == '':
+                    continue
+                
+                try:
+                    # Parse the datetime
+                    bloom_date = pd.to_datetime(bloom_date_str)
+                    
+                    # Extract year from column name (should match bloom_date year)
+                    year = int(year_col)
+                    
+                    # Create record
+                    record = {
+                        'record_id': f'jma_sakura_{city_name.lower().replace(" ", "_")}_{year}',
+                        'data_source': 'Japan Meteorological Agency (JMA) Historical',
+                        'scientific_name': species_name,
+                        'family': 'Rosaceae',
+                        'genus': species_name.split()[0],  # First word of scientific name
+                        'species': species_code,
+                        'common_name': common_name,
+                        'location_name': city_name,
+                        'prefecture': '',  # Could be extracted from region if needed
+                        'region': 'Japan',
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'elevation_m': elevation,
+                        'date': bloom_date,
+                        'year': year,
+                        'month': bloom_date.month,
+                        'day_of_year': bloom_date.timetuple().tm_yday,
+                        'season': self.determine_season(bloom_date),
+                        'full_bloom_date': pd.NaT,  # Not available in this dataset
+                        'full_bloom_day_of_year': np.nan,
+                        'temperature_avg': np.nan,  # Will be added by feature engineering
+                        'temperature_min': np.nan,
+                        'temperature_max': np.nan,
+                        'precipitation': np.nan,
+                        'trait': 'first flowering (kaika)',
+                        'basis_of_record': 'Human Observation',
+                        'is_prediction': False,  # Historical observations
+                        'currently_observed': currently_observed,
+                        'species_notes': notes
+                    }
+                    
+                    records.append(record)
+                    
+                except Exception as e:
+                    print(f"   Warning: Could not parse date '{bloom_date_str}' for {city_name} in {year_col}: {e}")
+                    continue
+        
+        # Create DataFrame from records
+        cleaned = pd.DataFrame(records)
+        
+        if len(cleaned) == 0:
+            print(f" WARNING: No historical sakura data could be processed!")
+            return pd.DataFrame()
+        
+        # Remove duplicates
+        print(f" Removing duplicates...")
+        initial_count = len(cleaned)
+        cleaned = cleaned.drop_duplicates(
+            subset=['location_name', 'latitude', 'longitude', 'year', 'day_of_year'],
+            keep='first'
+        )
+        removed = initial_count - len(cleaned)
+        print(f"   Removed {removed} duplicate observations")
+        
+        # Sort by date
+        cleaned = cleaned.sort_values(['year', 'day_of_year', 'location_name']).reset_index(drop=True)
+        
+        # Summary statistics
+        print(f"\n Historical Sakura Data Summary:")
+        print(f"   Total observations: {len(cleaned):,}")
+        print(f"   Cities: {cleaned['location_name'].nunique()}")
+        print(f"   Year range: {cleaned['year'].min()} - {cleaned['year'].max()}")
+        print(f"   Species: {cleaned['scientific_name'].nunique()}")
+        for species in cleaned['scientific_name'].unique():
+            count = (cleaned['scientific_name'] == species).sum()
+            print(f"     • {species}: {count:,} observations")
+        print(f"   Currently observed stations: {cleaned['currently_observed'].sum()}")
+        print(f"   Geographic range:")
+        print(f"     • Latitude: {cleaned['latitude'].min():.2f}° to {cleaned['latitude'].max():.2f}°")
+        print(f"     • Longitude: {cleaned['longitude'].min():.2f}° to {cleaned['longitude'].max():.2f}°")
+        print(f"     • Elevation: {cleaned['elevation_m'].min():.0f}m to {cleaned['elevation_m'].max():.0f}m")
+        
+        return cleaned
+    
     def clean_symphyotrichum_data(self, csv_path):
         """
         Clean Symphyotrichum species data (National Phenology Network).
@@ -406,7 +566,15 @@ class BloomDataCleaner:
             'trait', 'basis_of_record', 'is_prediction'
         ]
         
-        combined = combined[column_order]
+        # Add optional columns if they exist
+        optional_columns = ['elevation_m', 'currently_observed', 'species_notes']
+        for col in optional_columns:
+            if col in combined.columns and col not in column_order:
+                column_order.append(col)
+        
+        # Select only columns that exist in the dataframe
+        available_columns = [col for col in column_order if col in combined.columns]
+        combined = combined[available_columns]
         
         print(f" Combined dataset: {len(combined)} total observations")
         print(f"   Species: {combined['scientific_name'].nunique()}")
@@ -675,7 +843,8 @@ class BloomDataCleaner:
             return "N/A"
     
     def run_full_pipeline(self, cherry_forecasts=None, cherry_places=None, 
-                         symphyotrichum_data=None, sweet_cherry_data=None):
+                         symphyotrichum_data=None, sweet_cherry_data=None,
+                         historical_sakura=None, sakura_cities_geocoded=None):
         """
         Execute the complete data cleaning pipeline for all datasets.
         
@@ -684,13 +853,15 @@ class BloomDataCleaner:
             cherry_places: Path to cherry_blossom_places.csv (or None to skip)
             symphyotrichum_data: Path to data.csv (or None to skip)
             sweet_cherry_data: Path to sweet cherry data (or None to skip)
+            historical_sakura: Path to sakura_first_bloom_dates.csv (or None to skip)
+            sakura_cities_geocoded: Path to japan_cities_geocoded.csv (or None to skip)
         """
         print("\n🚀 Starting Multi-Dataset Bloom Data Cleaning Pipeline\n")
         print("="*70)
         
         datasets = []
         
-        # Process Japanese Cherry Blossoms
+        # Process Japanese Cherry Blossoms (2024 forecasts)
         if cherry_forecasts and cherry_places:
             # Try to find files in different locations
             forecasts_path = self._find_file(cherry_forecasts)
@@ -700,7 +871,23 @@ class BloomDataCleaner:
                 cherry_df = self.clean_japanese_cherry_data(forecasts_path, places_path)
                 datasets.append(cherry_df)
             else:
-                print(f" Skipping Japanese cherry data - files not found")
+                print(f" Skipping Japanese cherry forecast data - files not found")
+        
+        # Process Historical Sakura Data (1953-2025) - NEW!
+        if historical_sakura and sakura_cities_geocoded:
+            sakura_path = self._find_file(historical_sakura)
+            cities_path = self._find_file(sakura_cities_geocoded)
+            
+            if sakura_path and cities_path:
+                historical_df = self.clean_historical_sakura_data(sakura_path, cities_path)
+                if len(historical_df) > 0:
+                    datasets.append(historical_df)
+            else:
+                print(f" Skipping historical sakura data - files not found")
+                if not sakura_path:
+                    print(f"   Missing: {historical_sakura}")
+                if not cities_path:
+                    print(f"   Missing: {sakura_cities_geocoded}")
         
         # Process Symphyotrichum
         if symphyotrichum_data:
@@ -766,6 +953,7 @@ def main():
     ╔══════════════════════════════════════════════════════════════════════╗
     ║                  BLOOMBLY DATA CLEANING PIPELINE                     ║
     ║                     Climate Change Bloom Analysis                    ║
+    ║          Now with 73 Years of Japanese Sakura Data! 🌸              ║
     ╚══════════════════════════════════════════════════════════════════════╝
     """)
     
@@ -773,6 +961,8 @@ def main():
     cleaned_data = cleaner.run_full_pipeline(
         cherry_forecasts='cherry_blossom_forecasts.csv',
         cherry_places='cherry_blossom_places.csv',
+        historical_sakura='sakura_first_bloom_dates.csv',
+        sakura_cities_geocoded='japan_cities_geocoded.csv',
         symphyotrichum_data='data.csv',
         sweet_cherry_data='Sweet_cherry_phenology_data_1978-2015.csv'
     )
@@ -780,10 +970,16 @@ def main():
     print("\n Output files created:")
     print("   ✓ data/processed/clean_blooms_ml.csv      (for ML training)")
     print("   ✓ data/processed/blooms.geojson           (for 3D globe visualization)")
+    print("   ✓ data/processed/feature_metadata.json    (feature engineering metadata)")
+    print("\n Dataset Summary:")
+    print(f"   • Total observations: {len(cleaned_data):,}")
+    print(f"   • Historical sakura (1953-2025): ~5,800 observations from 102 cities")
+    print(f"   • Geographic coverage: Japan (primary), Europe, North America")
+    print(f"   • Species tracked: {cleaned_data['scientific_name'].nunique()}")
     print("\n Next steps:")
-    print("   1. Move CSV files to data/raw/ folder")
-    print("   2. Run feature engineering: python ml/src/features.py")
-    print("   3. Train ML model: python ml/src/train.py")
+    print("   1. Run feature engineering: python ml/src/features.py")
+    print("   2. Train ML model: python ml/src/train.py")
+    print("   3. Generate predictions for 2026-2030")
 
 
 if __name__ == "__main__":
