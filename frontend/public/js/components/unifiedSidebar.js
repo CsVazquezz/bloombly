@@ -89,7 +89,7 @@ function attachUnifiedSidebarEventListeners() {
   
   // Point style switcher
   const pointStyleSwitcher = document.getElementById('pointStyleSwitcher');
-  const pointStyleOptions = ['Points', 'Hexagons', 'Points + Rings'];
+  const pointStyleOptions = ['Points', 'Hexagons', 'Rings'];
   
   document.querySelectorAll('[data-target="pointStyleSwitcher"]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -166,7 +166,7 @@ function renderDatasetContent() {
   dynamicContent.innerHTML = `
     <!-- Dataset Data Controls -->
     <div class="filter-section">
-      <select id="datasetSelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none;">
+      <select id="datasetSelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none;">
         <option value="">-- Choose Dataset --</option>
         <option value="blooms">Bloom Observations</option>
         <option value="flowering_sites">Flowering Sites</option>
@@ -208,20 +208,24 @@ function renderPredictionContent() {
   dynamicContent.innerHTML = `
     <!-- ML Prediction Controls -->
     <div class="filter-section">
-      <div style="margin-top: 8px;">
-        <label style="font-size: 11px; color: #4ED9D9; font-weight: 200;">
-          Confidence: 
-          <input type="number" id="predConfidenceInput" min="0" max="1" step="0.1" value="0.3" style="width: 50px; padding: 2px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 4px;">
-        </label>
-        <label style="font-size: 11px; margin-left: 8px; color: #4ED9D9; font-weight: 200;">
-          Count: 
-          <input type="number" id="predNumPredictionsInput" min="50" max="500" step="50" value="150" style="width: 50px; padding: 2px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 4px;">
-        </label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+        <div>
+          <label style="font-size: 11px; color: #4ED9D9; font-weight: 200; display: block; margin-bottom: 4px;">
+            Confidence
+          </label>
+          <input type="number" id="predConfidenceInput" min="0" max="1" step="0.1" value="0.3" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px; box-sizing: border-box;">
+        </div>
+        <div>
+          <label style="font-size: 11px; color: #4ED9D9; font-weight: 200; display: block; margin-bottom: 4px;">
+            Count
+          </label>
+          <input type="number" id="predNumPredictionsInput" min="50" max="500" step="50" value="150" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px; box-sizing: border-box;">
+        </div>
       </div>
       
       <label style="font-size: 11px; margin-top: 8px; display: block; color: #4ED9D9; font-weight: 200;">
         Location Type:
-        <select id="predAoiTypeSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none; box-sizing: border-box;">
+        <select id="predAoiTypeSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
           <option value="point">Point (Lat/Lon)</option>
           <option value="state" selected>State</option>
           <option value="country">Country</option>
@@ -231,10 +235,10 @@ function renderPredictionContent() {
       <!-- Point coordinates -->
       <div id="predPointCoordinates" style="display:none; margin-top: 8px; font-size: 11px;">
         <label>Lat: 
-          <input type="number" id="predLatInput" min="-90" max="90" step="0.01" placeholder="20.5" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 4px;">
+          <input type="number" id="predLatInput" min="-90" max="90" step="0.01" placeholder="20.5" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
         </label>
         <label style="margin-left: 4px;">Lon: 
-          <input type="number" id="predLonInput" min="-180" max="180" step="0.01" placeholder="-100" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 4px;">
+          <input type="number" id="predLonInput" min="-180" max="180" step="0.01" placeholder="-100" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
         </label>
       </div>
       
@@ -242,7 +246,7 @@ function renderPredictionContent() {
       <div id="predCountryOptions" style="display:none; margin-top: 8px;">
         <label style="font-size: 11px; display: block; color: #4ED9D9; font-weight: 200;">
           Country:
-          <select id="predAoiCountrySelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none; box-sizing: border-box;">
+          <select id="predAoiCountrySelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
             <option value="">Select...</option>
             <option value="Mexico">Mexico</option>
             <option value="United States">United States</option>
@@ -254,7 +258,7 @@ function renderPredictionContent() {
       <div id="predStateOptions" style="display:block; margin-top: 8px;">
         <label style="font-size: 11px; display: block; color: #4ED9D9; font-weight: 200;">
           State:
-          <select id="predAoiStateSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none; box-sizing: border-box;">
+          <select id="predAoiStateSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
             <optgroup label="🇲🇽 Mexican States">
               <option value="Queretaro" selected>Querétaro</option>
               <option value="Jalisco">Jalisco</option>
@@ -279,7 +283,7 @@ function renderPredictionContent() {
       
       <label style="font-size: 11px; margin-top: 8px; display: block; color: #4ED9D9; font-weight: 200;">
         Date:
-        <input type="date" id="predDateInput" value="2025-10-05" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none; box-sizing: border-box;">
+        <input type="date" id="predDateInput" value="2025-10-05" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
       </label>
       
       <button id="predFetchDataBtn" class="load-dataset-btn">

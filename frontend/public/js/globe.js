@@ -21,6 +21,8 @@ export function initGlobe() {
     .pointColor(getColorForFeature)
     .pointRadius(calculatePointRadius)
     .pointAltitude(0)
+    .pointsMerge(false)
+    .onPointClick(handlePointClick)
     .ringsData([])
     .ringColor(getColorForFeature)
     .ringMaxRadius('maxR')
@@ -36,6 +38,13 @@ export function initGlobe() {
   globe.controls().autoRotateSpeed = 0.35;
 
   return globe;
+}
+
+function handlePointClick(point, event, coords) {
+  // Import the showDescriptionCard function dynamically
+  import('./components/descriptionCard.js').then(module => {
+    module.showDescriptionCard(point, event, coords);
+  });
 }
 
 export function getGlobe() {

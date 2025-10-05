@@ -4,6 +4,7 @@ import { initGlobe, createPointFromFeature, initializeClouds, switchToPointsMode
 import { initTopSelector } from './components/topSelector.js';
 import { initUnifiedSidebar } from './components/unifiedSidebar.js';
 import { initTimeline, buildTimelineSteps } from './components/timeline.js';
+import { initDescriptionCard } from './components/descriptionCard.js';
 
 // Initialize the application
 async function init() {
@@ -11,6 +12,7 @@ async function init() {
   initTopSelector();
   initUnifiedSidebar();
   initTimeline();
+  initDescriptionCard();
   
   // Initialize globe
   initGlobe();
