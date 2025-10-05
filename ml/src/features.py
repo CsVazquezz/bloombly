@@ -12,9 +12,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import math
+import os
 from typing import Dict, Tuple, Optional
 import warnings
 warnings.filterwarnings('ignore')
+
+# Load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("  python-dotenv not available. Install with: pip install python-dotenv")
 
 # Google Earth Engine import (optional)
 try:
@@ -47,11 +55,31 @@ class BloomFeatureEngineer:
         self.use_gee = use_gee and GEE_AVAILABLE
         if self.use_gee:
             try:
-                ee.Initialize()
-                print(" Google Earth Engine initialized successfully")
+                # Try to authenticate using service account credentials from .env
+                credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+                project_id = os.getenv('EE_PROJECT')
+                
+                if credentials_json and project_id:
+                    # Parse the JSON credentials
+                    credentials_dict = json.loads(credentials_json)
+                    
+                    # Create service account credentials
+                    credentials = ee.ServiceAccountCredentials(
+                        credentials_dict['client_email'],
+                        key_data=credentials_json
+                    )
+                    
+                    # Initialize with service account
+                    ee.Initialize(credentials, project=project_id)
+                    print("✅ Google Earth Engine initialized successfully with service account")
+                else:
+                    # Fallback to default authentication
+                    ee.Initialize()
+                    print("✅ Google Earth Engine initialized successfully")
+                    
             except Exception as e:
-                print(f"️  GEE initialization failed: {e}")
-                print("   Run: earthengine authenticate")
+                print(f"❌ GEE initialization failed: {e}")
+                print("   Make sure your .env file has valid GEE credentials")
                 self.use_gee = False
         
         # Cache for API responses to avoid redundant calls
