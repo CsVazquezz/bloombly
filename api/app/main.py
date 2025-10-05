@@ -12,10 +12,12 @@ try:
     from . import config
     from .routes.data import data_bp
     from .routes.predict import predict_bp
+    from .routes.sakura import sakura_bp
 except ImportError:
     import config
     from routes.data import data_bp
     from routes.predict import predict_bp
+    from routes.sakura import sakura_bp
 
 # Try to import Earth Engine, but make it optional
 try:
@@ -86,6 +88,7 @@ initialize_earth_engine()
 
 app.register_blueprint(data_bp, url_prefix='/api/data')
 app.register_blueprint(predict_bp, url_prefix='/api/predict')
+app.register_blueprint(sakura_bp, url_prefix='/api/sakura')
 
 @app.route('/')
 def index():
