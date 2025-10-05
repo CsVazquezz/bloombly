@@ -17,11 +17,8 @@
   font-size: 28px;
   font-weight: bold;
   margin-bottom: 15px;
-  background: linear-gradient(135deg, #00C875 0%, #00FFAE 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 0 20px rgba(0, 255, 174, 0.3);
+  color: #4ED9D9;
+  text-shadow: 0 0 6px rgba(78, 217, 217, 0.15);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -30,10 +27,7 @@
 
 #currentYear,
 #currentSeason {
-  background: linear-gradient(135deg, #00C875 0%, #00FFAE 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #4ED9D9;
 }
 
 #timelineControls {
@@ -50,7 +44,7 @@
   border: none;
   border-radius: 50%;
   background-color: transparent;
-  color: #00FFAE;
+  color: #4ED9D9;
   cursor: pointer;
   font-size: 20px;
   transition: all 0.3s;
@@ -62,7 +56,7 @@
 }
 
 .timeline-btn i {
-  filter: drop-shadow(0 0 8px rgba(0, 255, 174, 0.5));
+  filter: drop-shadow(0 0 2px rgba(78, 217, 217, 0.2));
 }
 
 .timeline-btn:hover:not(:disabled) {
@@ -71,12 +65,12 @@
 }
 
 .timeline-btn:disabled {
-  color: rgba(0, 255, 174, 0.3);
+  color: rgba(78, 217, 217, 0.3);
   cursor: not-allowed;
 }
 
 .timeline-btn:disabled i {
-  filter: drop-shadow(0 0 3px rgba(0, 255, 174, 0.2));
+  filter: drop-shadow(0 0 2px rgba(78, 217, 217, 0.15));
 }
 
 .timeline-btn.step-btn {
@@ -106,10 +100,10 @@
 @keyframes pulse {
   0%, 100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(0, 255, 174, 0.5));
+    filter: drop-shadow(0 0 2px rgba(78, 217, 217, 0.2));
   }
   50% {
     transform: scale(1.1);
-    filter: drop-shadow(0 0 16px rgba(22, 224, 155, 0.8));
+    filter: drop-shadow(0 0 6px rgba(22, 224, 155, 0.3));
   }
 }
