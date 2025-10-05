@@ -666,15 +666,15 @@ class ImprovedBloomPredictor:
             print(f"  → Generating predictions for {len(self.species_bloom_windows)} species...")
             for i, (species, bloom_info) in enumerate(self.species_bloom_windows.items()):
                 # Early stopping if we have enough predictions
-                if len(predictions) >= num_predictions * 2:
+                if len(predictions) >= num_predictions * 3:  # Increased from 2x to 3x
                     print(f"    Early stopping: already have {len(predictions)} predictions")
                     break
                     
                 print(f"    Processing species {i+1}/{len(self.species_bloom_windows)}: {species}")
                 
                 # Sample locations within the AOI bounds
-                # Use uniform distribution across the entire AOI
-                n_samples = min(30, max(20, num_predictions // len(self.species_bloom_windows)))
+                # Increased samples to get more predictions
+                n_samples = min(100, max(50, num_predictions // len(self.species_bloom_windows) * 2))
                 
                 # Generate random locations within AOI bounds
                 candidate_lats = np.random.uniform(

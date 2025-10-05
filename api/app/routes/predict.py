@@ -50,7 +50,7 @@ def get_aoi_bounds(aoi_type, aoi_state, aoi_country, bbox):
     """Returns the bounding box for a given AOI."""
     if aoi_type == 'state' and aoi_state in config.STATE_BOUNDS:
         return config.STATE_BOUNDS[aoi_state]
-    if aoi_type == 'country' and aoi_country.lower() in config.COUNTRY_BOUNDS:
+    if aoi_type == 'country' and aoi_country and aoi_country.lower() in config.COUNTRY_BOUNDS:
         return config.COUNTRY_BOUNDS[aoi_country.lower()]
     if aoi_type == 'bbox' and bbox and len(bbox) == 4:
         return {'min_lon': bbox[0], 'min_lat': bbox[1], 'max_lon': bbox[2], 'max_lat': bbox[3]}
@@ -80,6 +80,7 @@ def predict_blooms():
         aoi_bounds = get_aoi_bounds(query_params.aoi_type, query_params.aoi_state, query_params.aoi_country, query_params.bbox)
         
         confidence_threshold = float(request.args.get('confidence', '0.3'))
+        num_predictions = int(request.args.get('num_predictions', '200'))  # Increased default from 100 to 200
 
         if query_params.date:
             target_date = query_params.date
@@ -89,7 +90,7 @@ def predict_blooms():
                 predictions = predictor.predict_blooms_for_date(
                     target_date, 
                     aoi_bounds, 
-                    num_predictions=100,
+                    num_predictions=num_predictions,
                     confidence_threshold=confidence_threshold
                 )
                 model_info = "ML model trained on bloom dynamics with temporal features and environmental factors (v2)"
@@ -107,6 +108,7 @@ def predict_blooms():
                 "method": query_params.method,
                 "model_version": version,
                 "confidence_threshold": confidence_threshold if version == 'v2' else None,
+                "num_predictions": num_predictions if version == 'v2' else None,
                 "model_info": model_info
             }
             return create_geojson_response(predictions, metadata)
