@@ -8,6 +8,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score
 import ee
 import config
+import threading
 
 class EnhancedBloomPredictor:
     """
@@ -30,6 +31,7 @@ class EnhancedBloomPredictor:
         self.feature_columns = []
         self.species_patterns = {}
         self.environmental_cache = {}
+        self.is_training = False
 
         if self.use_earth_engine:
             try:
@@ -40,8 +42,22 @@ class EnhancedBloomPredictor:
                 self.use_earth_engine = False
 
         self.load_and_process_data()
-        self.build_environmental_features()
-        self.train_model()
+
+        self.is_training = True
+        training_thread = threading.Thread(target=self._train_model_background)
+        training_thread.daemon = True
+        training_thread.start()
+
+    def _train_model_background(self):
+        """Runs the training pipeline in a background thread."""
+        try:
+            self.build_environmental_features()
+            self.train_model()
+        except Exception as e:
+            logging.error(f"Error during background training: {e}")
+        finally:
+            self.is_training = False
+            logging.info("Background training finished.")
 
     def load_and_process_data(self):
         """Loads and processes historical bloom data from a CSV file."""
@@ -229,7 +245,7 @@ class EnhancedBloomPredictor:
 
     def predict_blooms_enhanced(self, target_date, aoi_bounds=None, num_predictions=50):
         """Predicts blooms using the enhanced machine learning model."""
-        if self.model is None:
+        if self.model is None or self.is_training:
             logging.warning("Model not trained, falling back to statistical method.")
             return self.predict_blooms_statistical(target_date, aoi_bounds, num_predictions)
 

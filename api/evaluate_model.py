@@ -35,6 +35,16 @@ def evaluate_model():
     from bloom_predictor_v2 import ImprovedBloomPredictor
     
     predictor = ImprovedBloomPredictor(use_earth_engine=False)
+
+    # Wait for the model to finish training in the background
+    import time
+    start_time = time.time()
+    while predictor.is_training:
+        print("Waiting for model to finish training...")
+        time.sleep(5)
+        if time.time() - start_time > 300: # 5 minute timeout
+            print("Timeout waiting for model to train.")
+            sys.exit(1)
     
     print(f"✓ Model loaded")
     print(f"  Training samples: {len(predictor.feature_data)}")

@@ -19,10 +19,16 @@ NUM_PREDICTIONS = 100  # Increased for v2 model (filters by confidence)
 # AOI
 DEFAULT_AOI_TYPE = 'global'
 STATE_BOUNDS = {
+    # United States
     'Texas': {'min_lat': 25.8, 'max_lat': 36.5, 'min_lon': -106.6, 'max_lon': -93.5},
     'California': {'min_lat': 32.5, 'max_lat': 42.0, 'min_lon': -124.4, 'max_lon': -114.1},
     'Florida': {'min_lat': 24.5, 'max_lat': 31.0, 'min_lon': -87.6, 'max_lon': -79.8},
-    'New York': {'min_lat': 40.5, 'max_lat': 45.0, 'min_lon': -79.8, 'max_lon': -71.8}
+    'New York': {'min_lat': 40.5, 'max_lat': 45.0, 'min_lon': -79.8, 'max_lon': -71.8},
+    # Mexico
+    'Chihuahua': {'min_lat': 25.5, 'max_lat': 31.8, 'min_lon': -109.1, 'max_lon': -103.3},
+    'Queretaro': {'min_lat': 20.0, 'max_lat': 21.7, 'min_lon': -100.5, 'max_lon': -99.0},
+    'Sonora': {'min_lat': 26.0, 'max_lat': 32.5, 'min_lon': -115.0, 'max_lon': -108.4},
+    'Jalisco': {'min_lat': 18.9, 'max_lat': 22.8, 'min_lon': -105.7, 'max_lon': -101.4}
 }
 COUNTRY_BOUNDS = {
     'united states': {'min_lat': 24.4, 'max_lat': 49.4, 'min_lon': -125.0, 'max_lon': -66.9},

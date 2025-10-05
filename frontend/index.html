@@ -108,6 +108,20 @@
       <button id="toggleModeBtn">Switch to Points</button>
     </div>
       <div class="filter-section">
+        <h4>Data Source</h4>
+        <label>
+          <select id="dataSourceSelect">
+            <option value="satellite">Satellite Data (Earth Engine)</option>
+            <option value="prediction">ML Predictions (v2)</option>
+          </select>
+        </label>
+        <div id="predictionOptions" style="display:none; margin-top: 8px;">
+          <label>Confidence: 
+            <input type="number" id="confidenceInput" min="0" max="1" step="0.1" value="0.5" style="width: 60px;">
+          </label>
+        </div>
+      </div>
+      <div class="filter-section">
         <h4>Area of Interest (AOI)</h4>
         <label>Type:
           <select id="aoiTypeSelect">
@@ -118,7 +132,7 @@
         </label>
         <label>Country: <input type="text" id="aoiCountryInput" placeholder="e.g. United States, Mexico"></label>
         <label>State: <input type="text" id="aoiStateInput" placeholder="e.g. Texas"></label>
-        <label>Date: <input type="date" id="dateInput" value="2024-07-01"></label>
+        <label>Date: <input type="date" id="dateInput" value="2024-09-15"></label>
         <button id="applyAoiBtn">Apply AOI</button>
       </div>
     <div id="filters">
@@ -439,8 +453,8 @@
     // DATA LOADING
     // ============================================================================
     function loadGeoJSONData() {
-      // Fetch bloom data from API
-      fetch(`${API_BASE_URL}/blooms?aoi_type=global&date=2024-07-01`)
+      // Fetch bloom data from API (default to satellite data)
+      fetch(`${API_BASE_URL}/data/blooms?aoi_type=global&date=2024-09-15`)
         .then(response => response.json())
         .then(data => {
           const allFeatures = data.features.filter(feature => 
@@ -587,6 +601,12 @@
     document.getElementById('toggleRingsBtn').addEventListener('click', handleToggleRingsClick);
     document.getElementById('toggleModeBtn').addEventListener('click', handleToggleModeClick);
     
+    // Data source selection
+    document.getElementById('dataSourceSelect').addEventListener('change', function(e) {
+      const predictionOptions = document.getElementById('predictionOptions');
+      predictionOptions.style.display = e.target.value === 'prediction' ? 'block' : 'none';
+    });
+    
     // Filter listeners
     document.getElementById('seasonCheckboxes').addEventListener('change', handleSeasonCheckboxChange);
     document.getElementById('familyCheckboxes').addEventListener('change', handleFamilyCheckboxChange);
@@ -598,18 +618,31 @@
       const aoiCountry = document.getElementById('aoiCountryInput').value.trim();
       const aoiState = document.getElementById('aoiStateInput').value.trim();
       const date = document.getElementById('dateInput').value;
+      const dataSource = document.getElementById('dataSourceSelect').value;
+      const confidence = document.getElementById('confidenceInput').value;
 
-      console.log('AOI Button clicked:', { aoiType, aoiCountry, aoiState, date });
+      console.log('AOI Button clicked:', { aoiType, aoiCountry, aoiState, date, dataSource });
 
       // Build query string
-      const qs = new URLSearchParams({
+      const params = {
         aoi_type: aoiType,
-        aoi_country: aoiCountry,
-        aoi_state: aoiState,
         date: date
-      }).toString();
-
-      const apiUrl = `${API_BASE_URL}/blooms?` + qs;
+      };
+      
+      if (aoiCountry) params.aoi_country = aoiCountry;
+      if (aoiState) params.aoi_state = aoiState;
+      
+      // Add prediction-specific parameters
+      if (dataSource === 'prediction') {
+        params.method = 'v2';
+        params.confidence = confidence;
+      }
+      
+      const qs = new URLSearchParams(params).toString();
+      
+      // Choose endpoint based on data source
+      const endpoint = dataSource === 'prediction' ? 'predict/blooms' : 'data/blooms';
+      const apiUrl = `${API_BASE_URL}/${endpoint}?${qs}`;
       console.log('Fetching from:', apiUrl);
 
       fetch(apiUrl)
@@ -620,10 +653,10 @@
         .then(data => {
           console.log('API Response data:', data);
           console.log('Number of features:', data.features ? data.features.length : 0);
+          console.log('Metadata:', data.metadata);
 
           const allFeatures = (data.features || []).filter(feature => {
             const hasProps = feature.properties && feature.properties.Family && feature.properties.Genus && feature.properties.Season;
-            console.log('Feature properties:', feature.properties, 'Has required props:', hasProps);
             return hasProps;
           });
 

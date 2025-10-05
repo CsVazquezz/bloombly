@@ -46,6 +46,16 @@ try:
     print("\nPlease wait...\n")
     
     predictor = ImprovedBloomPredictor(use_earth_engine=False)  # Use fallback for testing
+
+    # Wait for the model to finish training in the background
+    import time
+    start_time = time.time()
+    while predictor.is_training:
+        print("Waiting for model to finish training...")
+        time.sleep(5)
+        if time.time() - start_time > 300: # 5 minute timeout
+            print("Timeout waiting for model to train.")
+            sys.exit(1)
     
     print("\n" + "=" * 80)
     print(" MODEL INITIALIZED SUCCESSFULLY!")

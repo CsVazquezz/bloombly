@@ -1,5 +1,6 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
+python-dotenv==1.0.0
 earthengine-api==0.1.374
 geemap==0.28.2
 pandas>=2.2.0

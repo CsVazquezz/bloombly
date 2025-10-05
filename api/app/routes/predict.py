@@ -20,8 +20,17 @@ def get_predictor(version='v1'):
         if predictor_v2 is None:
             logging.info("Initializing Improved Bloom Predictor v2 (Learning Bloom Dynamics)...")
             try:
-                predictor_v2 = ImprovedBloomPredictor()
-                logging.info("✓ Bloom Predictor v2 ready!")
+                # Try to load pre-trained model first for fast startup
+                import os
+                model_path = os.path.join(os.path.dirname(__file__), '..', 'bloom_model_v2.pkl')
+                if os.path.exists(model_path):
+                    logging.info(f"  Loading pre-trained model from {model_path}...")
+                    predictor_v2 = ImprovedBloomPredictor(load_pretrained=model_path)
+                    logging.info("✓ Bloom Predictor v2 loaded from pre-trained model!")
+                else:
+                    logging.info("  No pre-trained model found, training new model...")
+                    predictor_v2 = ImprovedBloomPredictor()
+                    logging.info("✓ Bloom Predictor v2 ready!")
                 return predictor_v2
             except Exception as e:
                 logging.error(f"⚠ Failed to initialize v2: {e}")
@@ -130,8 +139,10 @@ def predict_blooms():
             return jsonify(error="Must provide either 'date' or both 'start_date' and 'end_date'"), 400
 
     except Exception as e:
+        import traceback
         logging.error(f"API Error in /blooms endpoint: {e}")
-        return jsonify(error="An unexpected error occurred."), 500
+        logging.error(traceback.format_exc())
+        return jsonify(error=str(e), details="Check server logs for traceback"), 500
 
 @predict_bp.route('/environmental', methods=['GET'])
 def get_environmental_data():
@@ -174,16 +185,27 @@ def get_model_info():
                     'observation_count': info['count']
                 }
             
+            # Calculate totals based on available data
+            positive_count = len(predictor.historical_blooms) if hasattr(predictor, 'historical_blooms') and predictor.historical_blooms is not None else 0
+            negative_count = len(predictor.negative_examples) if hasattr(predictor, 'negative_examples') and predictor.negative_examples is not None else 0
+            
+            # Use feature_data if available, otherwise calculate from positive + negative
+            if hasattr(predictor, 'feature_data') and predictor.feature_data is not None:
+                total_samples = len(predictor.feature_data)
+            else:
+                total_samples = positive_count + negative_count
+            
             model_info = {
                 "model_version": "v2",
                 "model_type": "Gradient Boosting Classifier (Bloom Dynamics)",
                 "description": "ML model trained on bloom vs no-bloom classification with temporal features",
+                "is_training": predictor.is_training if hasattr(predictor, 'is_training') else False,
                 "features": predictor.feature_columns if hasattr(predictor, 'feature_columns') else [],
                 "feature_count": len(predictor.feature_columns) if hasattr(predictor, 'feature_columns') else 0,
                 "training_data": {
-                    "positive_examples": len(predictor.historical_blooms) if hasattr(predictor, 'historical_blooms') else 0,
-                    "negative_examples": len(predictor.negative_examples) if hasattr(predictor, 'negative_examples') else 0,
-                    "total_samples": len(predictor.feature_data) if hasattr(predictor, 'feature_data') else 0
+                    "positive_examples": positive_count,
+                    "negative_examples": negative_count,
+                    "total_samples": total_samples
                 },
                 "species_bloom_windows": bloom_windows,
                 "species_count": len(predictor.species_bloom_windows),
@@ -212,6 +234,7 @@ def get_model_info():
             model_info = {
                 "model_version": "v1",
                 "model_type": "Enhanced Gradient Boosting Classifier",
+                "is_training": predictor.is_training if hasattr(predictor, 'is_training') else False,
                 "features": predictor.feature_columns if hasattr(predictor, 'feature_columns') else [],
                 "training_data_size": len(predictor.historical_data) if hasattr(predictor, 'historical_data') and not predictor.historical_data.empty else 0,
                 "species_count": len(predictor.species_patterns),

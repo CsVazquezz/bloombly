@@ -12,6 +12,7 @@ import ee
 from collections import defaultdict
 import json
 from google.oauth2 import service_account
+import threading
 
 class ImprovedBloomPredictor:
     """
@@ -40,6 +41,7 @@ class ImprovedBloomPredictor:
         self.feature_columns = []
         self.species_bloom_windows = {}
         self.environmental_cache = {}
+        self.is_training = False
         
         # Initialize Earth Engine
         self._initialize_earth_engine()
@@ -50,28 +52,51 @@ class ImprovedBloomPredictor:
             try:
                 self.load_model(load_pretrained)
                 print("✓ Pre-trained model loaded successfully!")
-                
-                # Still load historical data for species info
-                print("Loading historical bloom data for reference...")
-                self.load_and_process_data()
+                # Model already has historical_blooms and everything needed
                 return  # Skip training
             except Exception as e:
                 print(f"⚠ Failed to load pre-trained model: {e}")
                 print("  Training new model instead...")
         
-        # Train new model
-        print("Loading historical bloom data...")
-        self.load_and_process_data()
+        # If no pre-trained model, train in the background
+        else:
+            print("No pre-trained model found. Starting background training...")
+            self.is_training = True
+            # Load data synchronously so it's available for inspection
+            self.load_and_process_data()
+            
+            # Run the rest of the training process in a background thread
+            training_thread = threading.Thread(
+                target=self._train_and_save_model_background,
+                args=(load_pretrained if load_pretrained else 'bloom_model_v2.pkl',)
+            )
+            training_thread.daemon = True  # Allow main thread to exit
+            training_thread.start()
         
-        print("Generating negative examples...")
-        self.generate_negative_examples()
-        
-        print("Building temporal features...")
-        self.build_temporal_features()
-        
-        print("Training bloom prediction model...")
-        self.train_model()
-        
+    def _train_and_save_model_background(self, model_path):
+        """
+        Runs the full training pipeline in a background thread and saves the model.
+        """
+        try:
+            print("Generating negative examples...")
+            self.generate_negative_examples()
+            
+            print("Building temporal features...")
+            self.build_temporal_features()
+            
+            print("Training bloom prediction model...")
+            self.train_model()
+            
+            print(f"Saving model to {model_path}...")
+            self.save_model(model_path)
+            
+        except Exception as e:
+            print(f"Error during background training: {e}")
+        finally:
+            # Mark training as complete
+            self.is_training = False
+            print("Background training finished.")
+
     def _initialize_earth_engine(self):
         """Initialize Earth Engine with proper error handling"""
         if not self.use_earth_engine:
@@ -566,7 +591,7 @@ class ImprovedBloomPredictor:
         Predict bloom probability for a specific location, date, and species
         Returns probability between 0 and 1
         """
-        if self.model is None:
+        if self.model is None or self.is_training:
             return 0.0
         
         # If no species specified, use the most common one
@@ -615,6 +640,8 @@ class ImprovedBloomPredictor:
         """
         Predict blooms for a specific date using learned dynamics
         """
+        print(f"🔍 Starting prediction for {target_date}, threshold={confidence_threshold}")
+        
         if self.model is None:
             print("✗ Model not trained")
             return []
@@ -628,78 +655,96 @@ class ImprovedBloomPredictor:
         
         predictions = []
         
-        # Generate predictions for known species
-        for species, bloom_info in self.species_bloom_windows.items():
-            # Focus sampling near historical locations and bloom windows
-            lat_range = bloom_info['lat_range']
-            lon_range = bloom_info['lon_range']
-            
-            # Expand range slightly for exploration
-            lat_center = (lat_range[0] + lat_range[1]) / 2
-            lon_center = (lon_range[0] + lon_range[1]) / 2
-            lat_spread = (lat_range[1] - lat_range[0]) / 2 * 1.2  # 20% larger
-            lon_spread = (lon_range[1] - lon_range[0]) / 2 * 1.2
-            
-            # Sample locations
-            n_samples = max(50, num_predictions // len(self.species_bloom_windows))
-            
-            candidate_lats = np.random.normal(lat_center, lat_spread, n_samples)
-            candidate_lons = np.random.normal(lon_center, lon_spread, n_samples)
-            
-            # Clip to AOI bounds
-            candidate_lats = np.clip(candidate_lats, aoi_bounds['min_lat'], aoi_bounds['max_lat'])
-            candidate_lons = np.clip(candidate_lons, aoi_bounds['min_lon'], aoi_bounds['max_lon'])
-            
-            # Predict for each location
-            for lat, lon in zip(candidate_lats, candidate_lons):
-                probability = self.predict_bloom_probability(lat, lon, target_date, species)
-                
-                if probability >= confidence_threshold:
-                    # Get species details
-                    species_row = self.historical_blooms[
-                        self.historical_blooms['scientificName'] == species
-                    ].iloc[0]
-                    
-                    # Estimate bloom area based on probability and environmental conditions
-                    env_data = self.get_environmental_data(lat, lon, target_date)
-                    area = self._estimate_bloom_area(probability, env_data)
-                    
-                    feature = {
-                        "type": "Feature",
-                        "properties": {
-                            "Site": species,
-                            "Family": species_row['family'],
-                            "Genus": species_row['genus'],
-                            "Season": self._get_season(target_date.timetuple().tm_yday),
-                            "Area": area,
-                            "bloom_probability": round(probability, 3),
-                            "predicted_date": target_date.strftime('%Y-%m-%d'),
-                            "is_prediction": True,
-                            "model_version": "v2_bloom_dynamics",
-                            "environmental_factors": {
-                                "temperature": round(env_data['temp_mean'], 1),
-                                "precipitation": round(env_data['precip_total'], 1),
-                                "ndvi": round(env_data['ndvi_mean'], 3),
-                                "ndvi_trend": round(env_data['ndvi_trend'], 4)
-                            }
-                        },
-                        "geometry": {
-                            "type": "MultiPolygon",
-                            "coordinates": [[[
-                                [lon - 0.01, lat - 0.01],
-                                [lon + 0.01, lat - 0.01],
-                                [lon + 0.01, lat + 0.01],
-                                [lon - 0.01, lat + 0.01],
-                                [lon - 0.01, lat - 0.01]
-                            ]]]
-                        }
-                    }
-                    
-                    predictions.append(feature)
+        # OPTIMIZATION: Temporarily disable Earth Engine during predictions
+        # to use fast fallback data (otherwise hundreds of slow EE API calls)
+        original_ee_state = self.use_earth_engine
+        self.use_earth_engine = False
+        print(f"  → Using fallback environmental data (EE disabled for speed)")
         
-        # Sort by probability and return top predictions
-        predictions.sort(key=lambda x: x['properties']['bloom_probability'], reverse=True)
-        return predictions[:num_predictions]
+        try:
+            # Generate predictions for known species
+            print(f"  → Generating predictions for {len(self.species_bloom_windows)} species...")
+            for i, (species, bloom_info) in enumerate(self.species_bloom_windows.items()):
+                # Early stopping if we have enough predictions
+                if len(predictions) >= num_predictions * 2:
+                    print(f"    Early stopping: already have {len(predictions)} predictions")
+                    break
+                    
+                print(f"    Processing species {i+1}/{len(self.species_bloom_windows)}: {species}")
+                
+                # Sample locations within the AOI bounds
+                # Use uniform distribution across the entire AOI
+                n_samples = min(30, max(20, num_predictions // len(self.species_bloom_windows)))
+                
+                # Generate random locations within AOI bounds
+                candidate_lats = np.random.uniform(
+                    aoi_bounds['min_lat'], 
+                    aoi_bounds['max_lat'], 
+                    n_samples
+                )
+                candidate_lons = np.random.uniform(
+                    aoi_bounds['min_lon'], 
+                    aoi_bounds['max_lon'], 
+                    n_samples
+                )
+                
+                # Predict for each location
+                for lat, lon in zip(candidate_lats, candidate_lons):
+                    probability = self.predict_bloom_probability(lat, lon, target_date, species)
+                    
+                    if probability >= confidence_threshold:
+                        # Get species details
+                        species_row = self.historical_blooms[
+                            self.historical_blooms['scientificName'] == species
+                        ].iloc[0]
+                        
+                        # Estimate bloom area based on probability and environmental conditions
+                        env_data = self.get_environmental_data(lat, lon, target_date)
+                        area = self._estimate_bloom_area(probability, env_data)
+                        
+                        feature = {
+                            "type": "Feature",
+                            "properties": {
+                                "Site": species,
+                                "Family": species_row['family'],
+                                "Genus": species_row['genus'],
+                                "Season": self._get_season(target_date.timetuple().tm_yday),
+                                "Area": area,
+                                "bloom_probability": round(probability, 3),
+                                "predicted_date": target_date.strftime('%Y-%m-%d'),
+                                "is_prediction": True,
+                                "model_version": "v2_bloom_dynamics",
+                                "environmental_factors": {
+                                    "temperature": round(env_data['temp_mean'], 1),
+                                    "precipitation": round(env_data['precip_total'], 1),
+                                    "ndvi": round(env_data['ndvi_mean'], 3),
+                                    "ndvi_trend": round(env_data['ndvi_trend'], 4)
+                                }
+                            },
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [[[
+                                    [lon - 0.01, lat - 0.01],
+                                    [lon + 0.01, lat - 0.01],
+                                    [lon + 0.01, lat + 0.01],
+                                    [lon - 0.01, lat + 0.01],
+                                    [lon - 0.01, lat - 0.01]
+                                ]]]
+                            }
+                        }
+                        
+                        predictions.append(feature)
+            
+            # Sort by probability and return top predictions
+            print(f"  → Sorting {len(predictions)} predictions and returning top {num_predictions}")
+            predictions.sort(key=lambda x: x['properties']['bloom_probability'], reverse=True)
+            result = predictions[:num_predictions]
+            print(f"✓ Prediction complete! Returning {len(result)} blooms")
+            return result
+        
+        finally:
+            # Restore original Earth Engine state
+            self.use_earth_engine = original_ee_state
     
     def _estimate_bloom_area(self, probability, env_data):
         """Estimate bloom area based on probability and environmental conditions"""
@@ -736,7 +781,10 @@ class ImprovedBloomPredictor:
             'scaler': self.scaler,
             'feature_columns': self.feature_columns,
             'species_bloom_windows': self.species_bloom_windows,
-            'use_earth_engine': self.use_earth_engine
+            'use_earth_engine': self.use_earth_engine,
+            'historical_blooms': self.historical_blooms,  # Save historical data too
+            'negative_examples': self.negative_examples,
+            'feature_data': self.feature_data if hasattr(self, 'feature_data') else None
         }
         joblib.dump(model_data, path)
         print(f"✓ Model saved to {path}")
@@ -749,4 +797,11 @@ class ImprovedBloomPredictor:
         self.feature_columns = model_data['feature_columns']
         self.species_bloom_windows = model_data['species_bloom_windows']
         self.use_earth_engine = model_data.get('use_earth_engine', False)
+        self.historical_blooms = model_data.get('historical_blooms', pd.DataFrame())
+        self.negative_examples = model_data.get('negative_examples', pd.DataFrame())
+        self.feature_data = model_data.get('feature_data', None)
         print(f"✓ Model loaded from {path}")
+        print(f"  Loaded {len(self.historical_blooms)} bloom observations")
+        print(f"  Loaded {len(self.species_bloom_windows)} species")
+        if self.feature_data is not None:
+            print(f"  Loaded {len(self.feature_data)} feature samples")

@@ -56,6 +56,16 @@ def train_and_save_model(data_path='backend/data.csv',
         data_path=data_path,
         use_earth_engine=use_earth_engine
     )
+
+    # Wait for the model to finish training in the background
+    import time
+    start_time = time.time()
+    while predictor.is_training:
+        print("Waiting for model to finish training...")
+        time.sleep(5)
+        if time.time() - start_time > 300: # 5 minute timeout
+            print("Timeout waiting for model to train.")
+            sys.exit(1)
     
     # Training happens automatically in __init__
     # But if you want to retrain with different parameters:
