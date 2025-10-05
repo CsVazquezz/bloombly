@@ -38,12 +38,11 @@
 
 #colorsLegend h4 {
   margin: 0 0 8px 0;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 200;
   color: #4ED9D9;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 4px rgba(78, 217, 217, 0.3);
+  letter-spacing: 2px;
+  text-shadow: 0 0 4px rgba(78, 217, 217, 0.15);
 }
 
 .colors-list {
@@ -178,8 +177,8 @@
   text-align: center;
   font-size: 11px;
   color: #FFFFFF;
-  font-weight: 600;
-  text-shadow: 0 0 4px rgba(78, 217, 217, 0.3);
+  font-weight: 200;
+  text-shadow: 0 0 2px rgba(78, 217, 217, 0.2);
 }
 
 .toggle-row {
@@ -281,11 +280,10 @@
 .filter-section h4 {
   margin: 0 0 6px 0;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 200;
   color: #4ED9D9;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 4px rgba(78, 217, 217, 0.3);
+  letter-spacing: 2px;
+  text-shadow: 0 0 4px rgba(78, 217, 217, 0.15);
 }
 
 .checkbox-group {
@@ -401,11 +399,10 @@
 #legendContent h4 {
   margin: 0 0 8px 0;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 200;
   color: #4ED9D9;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 4px rgba(78, 217, 217, 0.3);
+  letter-spacing: 2px;
+  text-shadow: 0 0 4px rgba(78, 217, 217, 0.15);
 }
 
 #legendContent .legend-item {

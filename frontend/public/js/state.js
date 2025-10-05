@@ -1,5 +1,19 @@
 import { COLOR_MODE, DISPLAY_MODE } from './config.js';
 
+// Color palette for family colors
+const BLOOM_COLOR_PALETTE = [
+  '#E43A7B', // 🌸 Cerise Bloom
+  '#FF5C5C', // 🌺 Flame Rose
+  '#FF8A3C', // 🍊 Tangerine Glow
+  '#F5C400', // 🌼 Golden Pollen
+  '#DFA52B', // 🍯 Honey Amber
+  '#9C2B2B', // 🌹 Crimson Dust
+  '#A94ADB', // 💜 Orchid Beam
+  '#4C6DDA', // 🌌 Iris Blue
+  '#C457B5', // 🌺 Mauve Flame
+  '#F3E2D9'  // 🌤 Pearl White
+];
+
 // Application state
 export const state = {
   geojsonFeatures: [],
@@ -26,10 +40,8 @@ export const state = {
 
 // Color generation functions
 export function generateColorForFamily(family, index, total) {
-  const hue = (index * 360 / total) % 360;
-  const saturation = 70 + (index % 3) * 10;
-  const lightness = 50 + (index % 2) * 10;
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  // Use the color palette, cycling through if there are more families than colors
+  return BLOOM_COLOR_PALETTE[index % BLOOM_COLOR_PALETTE.length];
 }
 
 export function initializeFamilyColors() {

@@ -14,15 +14,16 @@
 
 #timelineLabel {
   text-align: center;
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 24px;
+  font-weight: 200;
   margin-bottom: 15px;
   color: #4ED9D9;
-  text-shadow: 0 0 6px rgba(78, 217, 217, 0.15);
+  text-shadow: 0 0 4px rgba(78, 217, 217, 0.15);
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 20px;
+  letter-spacing: 2px;
 }
 
 #currentYear,

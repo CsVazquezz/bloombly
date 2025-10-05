@@ -1,12 +1,14 @@
 import { CONFIG } from './config.js';
 import { state, initializeFamilyColors } from './state.js';
 import { initGlobe, createPointFromFeature, initializeClouds, switchToPointsMode } from './globe.js';
+import { initTopSelector } from './components/topSelector.js';
 import { initSidebar, createFilterUI, updateLegend } from './components/sidebar.js';
 import { initTimeline, buildTimelineSteps } from './components/timeline.js';
 
 // Initialize the application
 async function init() {
   // Initialize components
+  initTopSelector();
   initSidebar();
   initTimeline();
   

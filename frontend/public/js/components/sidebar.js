@@ -95,7 +95,7 @@ function attachSidebarEventListeners() {
   
   // Point color switcher
   const pointColorSwitcher = document.getElementById('pointColorSwitcher');
-  const pointColorOptions = ['Single Color', 'Color by Family'];
+  const pointColorOptions = ['Single Color', 'By Family'];
   
   document.querySelectorAll('[data-target="pointColorSwitcher"]').forEach(btn => {
     btn.addEventListener('click', () => {
