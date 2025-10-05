@@ -2,16 +2,15 @@ import { COLOR_MODE, DISPLAY_MODE } from './config.js';
 
 // Color palette for family colors
 const BLOOM_COLOR_PALETTE = [
-  '#E43A7B', // 🌸 Cerise Bloom
-  '#FF5C5C', // 🌺 Flame Rose
-  '#FF8A3C', // 🍊 Tangerine Glow
-  '#F5C400', // 🌼 Golden Pollen
-  '#DFA52B', // 🍯 Honey Amber
-  '#9C2B2B', // 🌹 Crimson Dust
-  '#A94ADB', // 💜 Orchid Beam
-  '#4C6DDA', // 🌌 Iris Blue
-  '#C457B5', // 🌺 Mauve Flame
-  '#F3E2D9'  // 🌤 Pearl White
+  '#dd001dff', // 🌺 Crimson Flame
+  '#ff469fff', // 🌸 Vivid Magenta
+  '#ffc20cff', // 🌼 Solar Marigold
+  '#f87b21ff', // 🍊 Tangerine Bloom
+  '#9cc300ff', // 💙 Azure Petal
+  '#a25cfeff', // 💜 Royal Violet
+  '#0e973eff', // 🌿 Spring Leaf
+  '#ff8eb9ff', // 🌹 Wine Dahlia
+  '#fdfdfdff'  // 🌤 Alpine White
 ];
 
 // Application state

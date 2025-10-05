@@ -1,6 +1,7 @@
 // Configuration   RING_PROPAGATION_SPEED: 0.5,
 export const CONFIG = {
   GEOJSON_FILES: ['../data/geojson/flowering_sites.geojson'],
+  COUNTRIES_GEOJSON_URL: 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
   CLOUDS_IMAGE_URL: '/clouds.png',
   EARTH_IMAGE_URL: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg',
   EARTH_TOPOLOGY_URL: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',

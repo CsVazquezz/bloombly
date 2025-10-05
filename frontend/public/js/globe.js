@@ -23,7 +23,12 @@ export function initGlobe() {
     .ringColor(getColorForFeature)
     .ringMaxRadius('maxR')
     .ringPropagationSpeed('propagationSpeed')
-    .ringRepeatPeriod('repeatPeriod');
+    .ringRepeatPeriod('repeatPeriod')
+    .polygonsData([])
+    .polygonCapColor(() => 'rgba(0, 0, 0, 0)')
+    .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
+    .polygonStrokeColor(() => 'rgba(255, 255, 255, 0.25)')
+    .polygonAltitude(0.001);
 
   globe.controls().autoRotate = false;
   globe.controls().autoRotateSpeed = 0.35;
@@ -191,7 +196,20 @@ function applyNormalStyle() {
     globeMaterial.shininess = 0;
     globeMaterial.transparent = false;
     globeMaterial.opacity = 1.0;
+    globeMaterial.emissive = new THREE.Color(0x000000);
+    globeMaterial.emissiveIntensity = 0;
     globeMaterial.needsUpdate = true;
+    
+    // Remove plain mode rim lights if they exist
+    const scene = globe.scene();
+    if (scene.userData.plainModeRimLight) {
+      scene.remove(scene.userData.plainModeRimLight);
+      scene.userData.plainModeRimLight = null;
+    }
+    if (scene.userData.plainModeRimLight2) {
+      scene.remove(scene.userData.plainModeRimLight2);
+      scene.userData.plainModeRimLight2 = null;
+    }
   }, 100);
 }
 
@@ -209,6 +227,8 @@ function applyDetailedStyle() {
     globeMaterial.bumpScale = 10;
     globeMaterial.transparent = false;
     globeMaterial.opacity = 1.0;
+    globeMaterial.emissive = new THREE.Color(0x000000);
+    globeMaterial.emissiveIntensity = 0;
     
     new THREE.TextureLoader().load('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-water.png', texture => {
       globeMaterial.specularMap = texture;
@@ -222,6 +242,17 @@ function applyDetailedStyle() {
     if (directionalLight) {
       directionalLight.position.set(1, 1, 1);
     }
+    
+    // Remove plain mode rim lights if they exist
+    const scene = globe.scene();
+    if (scene.userData.plainModeRimLight) {
+      scene.remove(scene.userData.plainModeRimLight);
+      scene.userData.plainModeRimLight = null;
+    }
+    if (scene.userData.plainModeRimLight2) {
+      scene.remove(scene.userData.plainModeRimLight2);
+      scene.userData.plainModeRimLight2 = null;
+    }
   }, 100);
 }
 
@@ -230,19 +261,38 @@ function applyPlainStyle() {
     .globeImageUrl(null)
     .bumpImageUrl(null)
     .showGlobe(true)
-    .showAtmosphere(false);
+    .showAtmosphere(true); // Enable atmosphere for edge glow
   
-  // Wait a frame, then set solid colors for globe
+  // Wait a frame, then set solid colors for globe with edge lighting
   setTimeout(() => {
     const globeMaterial = globe.globeMaterial();
-    globeMaterial.color = new THREE.Color('#1B1F25'); // Ocean color from palette
+    globeMaterial.color = new THREE.Color('#0a0e12'); // Much darker for plain mode
     globeMaterial.bumpScale = 0;
     globeMaterial.specularMap = null;
-    globeMaterial.specular = new THREE.Color(0x000000);
-    globeMaterial.shininess = 0;
+    globeMaterial.specular = new THREE.Color(0x111111);
+    globeMaterial.shininess = 3;
     globeMaterial.transparent = false;
     globeMaterial.opacity = 1.0;
+    globeMaterial.emissive = new THREE.Color('#050608'); // Very dark emissive
+    globeMaterial.emissiveIntensity = 0.2;
     globeMaterial.needsUpdate = true;
+    
+    // Enhance lighting for better edge definition
+    const scene = globe.scene();
+    const existingLights = scene.children.filter(child => child.isLight);
+    
+    // Add rim lighting if not already present
+    if (!scene.userData.plainModeRimLight) {
+      const rimLight = new THREE.DirectionalLight('#4ED9D9', 0.4);
+      rimLight.position.set(-2, 1, 3);
+      scene.add(rimLight);
+      scene.userData.plainModeRimLight = rimLight;
+      
+      const rimLight2 = new THREE.DirectionalLight('#4ED9D9', 0.3);
+      rimLight2.position.set(2, -1, -3);
+      scene.add(rimLight2);
+      scene.userData.plainModeRimLight2 = rimLight2;
+    }
   }, 100);
 }
 
@@ -256,3 +306,35 @@ export function removeNightSkyBackground() {
   globe.backgroundImageUrl(null)
        .backgroundColor('rgba(15,17,21,1)'); // Background color from palette
 }
+
+export async function loadCountryBorders() {
+  if (!globe) return;
+  
+  try {
+    // Fetch TopoJSON data
+    const response = await fetch(CONFIG.COUNTRIES_GEOJSON_URL);
+    const topoData = await response.json();
+    
+    // Convert TopoJSON to GeoJSON using topojson library
+    // The world-atlas data uses TopoJSON format which needs to be converted
+    const countries = topojson.feature(topoData, topoData.objects.countries);
+    
+    // Set the countries data to the globe
+    globe.polygonsData(countries.features);
+    
+    console.log('Country borders loaded successfully');
+  } catch (error) {
+    console.error('Error loading country borders:', error);
+  }
+}
+
+export function toggleCountryBorders(show) {
+  if (!globe) return;
+  
+  if (show) {
+    loadCountryBorders();
+  } else {
+    globe.polygonsData([]);
+  }
+}
+

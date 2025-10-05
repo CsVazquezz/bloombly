@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { COLOR_MODE, DISPLAY_MODE } from '../config.js';
-import { switchToHexMode, switchToPointsMode, toggleCloudsVisibility, refreshGlobeColors, applyGlobeStyle, setNightSkyBackground, removeNightSkyBackground } from '../globe.js';
+import { switchToHexMode, switchToPointsMode, toggleCloudsVisibility, refreshGlobeColors, applyGlobeStyle, setNightSkyBackground, removeNightSkyBackground, toggleCountryBorders } from '../globe.js';
 import { applyTimelineFilter } from './timeline.js';
 
 export function initSidebar() {
