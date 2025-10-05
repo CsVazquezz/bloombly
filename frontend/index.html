@@ -96,9 +96,112 @@
       border: 1px solid #ccc;
       border-radius: 3px;
     }
+    
+    #summary {
+      position: absolute;
+      top: 60px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      max-width: 350px;
+      max-height: calc(80vh - 70px);
+      overflow-y: auto;
+      display: none;
+      z-index: 999;
+    }
+    
+    #summary h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #2c3e50;
+      border-bottom: 2px solid #4CAF50;
+      padding-bottom: 5px;
+    }
+    
+    #summary h4 {
+      margin: 10px 0 5px 0;
+      font-size: 12px;
+      color: #34495e;
+    }
+    
+    .summary-stat {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+      padding: 3px 0;
+      border-bottom: 1px solid #ecf0f1;
+    }
+    
+    .summary-stat .label {
+      font-weight: 600;
+      color: #555;
+    }
+    
+    .summary-stat .value {
+      color: #2c3e50;
+    }
+    
+    .confidence-bar {
+      display: flex;
+      gap: 5px;
+      margin-top: 5px;
+    }
+    
+    .confidence-segment {
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      text-align: center;
+    }
+    
+    .high-confidence {
+      background-color: #27ae60;
+      color: white;
+    }
+    
+    .medium-confidence {
+      background-color: #f39c12;
+      color: white;
+    }
+    
+    .low-confidence {
+      background-color: #95a5a6;
+      color: white;
+    }
+    
+    #toggleSummaryBtn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(76, 175, 80, 0.9);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+    }
+    
+    #toggleSummaryBtn:hover {
+      background: rgba(69, 160, 73, 1);
+    }
   </style>
 </head>
 <body>
+  <button id="toggleSummaryBtn">Show Summary</button>
+  
+  <div id="summary">
+    <h3>Prediction Summary</h3>
+    <div id="summaryContent">
+      <p style="color: #7f8c8d; font-style: italic;">Load prediction data to see summary</p>
+    </div>
+  </div>
+  
   <div id="globeViz"></div>
   
   <div id="legend">
@@ -320,6 +423,104 @@
       `;
     }
     
+    function updateSummary(metadata) {
+      console.log('updateSummary called with metadata:', metadata);
+      const summaryContent = document.getElementById('summaryContent');
+      
+      if (!metadata || !metadata.summary) {
+        console.log('No summary data in metadata');
+        summaryContent.innerHTML = '<p style="color: #7f8c8d; font-style: italic;">No summary data available</p>';
+        return;
+      }
+      
+      const summary = metadata.summary;
+      console.log('Summary data:', summary);
+      let html = '';
+      
+      // Overview Section
+      html += '<h4>📊 Overview</h4>';
+      html += `<div class="summary-stat"><span class="label">Total Predictions:</span><span class="value">${summary.total_predictions || 0}</span></div>`;
+      html += `<div class="summary-stat"><span class="label">Unique Species:</span><span class="value">${summary.species_count || 0}</span></div>`;
+      html += `<div class="summary-stat"><span class="label">Plant Families:</span><span class="value">${summary.family_count || 0}</span></div>`;
+      if (summary.total_area) {
+        html += `<div class="summary-stat"><span class="label">Total Area:</span><span class="value">${summary.total_area.toLocaleString()} m²</span></div>`;
+      }
+      
+      // Probability Distribution (if available)
+      if (summary.average_probability !== undefined) {
+        html += '<h4>🎯 Confidence Levels</h4>';
+        html += `<div class="summary-stat"><span class="label">Average Probability:</span><span class="value">${(summary.average_probability * 100).toFixed(1)}%</span></div>`;
+        
+        if (summary.probability_range) {
+          html += `<div class="summary-stat"><span class="label">Range:</span><span class="value">${(summary.probability_range.min * 100).toFixed(1)}% - ${(summary.probability_range.max * 100).toFixed(1)}%</span></div>`;
+        }
+        
+        // Confidence bar
+        if (summary.high_confidence_count !== undefined) {
+          html += '<div class="confidence-bar">';
+          if (summary.high_confidence_count > 0) {
+            html += `<div class="confidence-segment high-confidence">High: ${summary.high_confidence_count}</div>`;
+          }
+          if (summary.medium_confidence_count > 0) {
+            html += `<div class="confidence-segment medium-confidence">Med: ${summary.medium_confidence_count}</div>`;
+          }
+          if (summary.low_confidence_count > 0) {
+            html += `<div class="confidence-segment low-confidence">Low: ${summary.low_confidence_count}</div>`;
+          }
+          html += '</div>';
+        }
+      }
+      
+      // Seasonal Distribution
+      if (summary.seasons && Object.keys(summary.seasons).length > 0) {
+        html += '<h4>🌸 Seasonal Distribution</h4>';
+        const sortedSeasons = Object.entries(summary.seasons).sort((a, b) => b[1] - a[1]);
+        sortedSeasons.forEach(([season, count]) => {
+          html += `<div class="summary-stat"><span class="label">${season}:</span><span class="value">${count}</span></div>`;
+        });
+      }
+      
+      // Family Distribution (top 5)
+      if (summary.families && Object.keys(summary.families).length > 0) {
+        html += '<h4>🌿 Top Plant Families</h4>';
+        const sortedFamilies = Object.entries(summary.families).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        sortedFamilies.forEach(([family, count]) => {
+          html += `<div class="summary-stat"><span class="label">${family}:</span><span class="value">${count}</span></div>`;
+        });
+      }
+      
+      // Environmental Summary
+      if (summary.environmental_summary && Object.keys(summary.environmental_summary).length > 0) {
+        html += '<h4>🌡️ Environmental Conditions</h4>';
+        const env = summary.environmental_summary;
+        
+        if (env.temperature) {
+          html += `<div class="summary-stat"><span class="label">Temperature (avg):</span><span class="value">${env.temperature.avg}°C</span></div>`;
+          html += `<div class="summary-stat"><span class="label">Temp Range:</span><span class="value">${env.temperature.min}°C - ${env.temperature.max}°C</span></div>`;
+        }
+        
+        if (env.precipitation) {
+          html += `<div class="summary-stat"><span class="label">Precipitation (avg):</span><span class="value">${env.precipitation.avg} mm</span></div>`;
+        }
+        
+        if (env.vegetation_index) {
+          html += `<div class="summary-stat"><span class="label">NDVI (avg):</span><span class="value">${env.vegetation_index.avg}</span></div>`;
+        }
+      }
+      
+      // Prediction Info
+      if (metadata.prediction_date) {
+        html += '<h4>ℹ️ Prediction Info</h4>';
+        html += `<div class="summary-stat"><span class="label">Date:</span><span class="value">${metadata.prediction_date}</span></div>`;
+        html += `<div class="summary-stat"><span class="label">Model:</span><span class="value">${metadata.model_version || 'N/A'}</span></div>`;
+        if (metadata.confidence_threshold) {
+          html += `<div class="summary-stat"><span class="label">Threshold:</span><span class="value">${(metadata.confidence_threshold * 100).toFixed(0)}%</span></div>`;
+        }
+      }
+      
+      summaryContent.innerHTML = html;
+    }
+    
     function updateLegend() {
       const legendContent = document.getElementById('legendContent');
       
@@ -478,6 +679,17 @@
           
           createFilterUI();
           updateLegend();
+          
+          // Update summary panel
+          if (data.metadata) {
+            console.log('Updating summary with metadata:', data.metadata);
+            updateSummary(data.metadata);
+            // Auto-show summary panel when data loads
+            document.getElementById('summary').style.display = 'block';
+            document.getElementById('toggleSummaryBtn').textContent = 'Hide Summary';
+          } else {
+            console.log('No metadata in response');
+          }
         })
         .catch(error => {
           console.error('Error loading bloom data from API:', error);
@@ -605,6 +817,20 @@
     document.getElementById('toggleRingsBtn').addEventListener('click', handleToggleRingsClick);
     document.getElementById('toggleModeBtn').addEventListener('click', handleToggleModeClick);
     
+    // Toggle summary button
+    document.getElementById('toggleSummaryBtn').addEventListener('click', function() {
+      const summaryPanel = document.getElementById('summary');
+      const toggleBtn = document.getElementById('toggleSummaryBtn');
+      
+      if (summaryPanel.style.display === 'none' || summaryPanel.style.display === '') {
+        summaryPanel.style.display = 'block';
+        toggleBtn.textContent = 'Hide Summary';
+      } else {
+        summaryPanel.style.display = 'none';
+        toggleBtn.textContent = 'Show Summary';
+      }
+    });
+    
     // Data source selection
     document.getElementById('dataSourceSelect').addEventListener('change', function(e) {
       const predictionOptions = document.getElementById('predictionOptions');
@@ -678,6 +904,17 @@
           console.log('Updating globe with features...');
           applyFilters();
           createFilterUI();
+          
+          // Update summary panel
+          if (data.metadata) {
+            console.log('Updating summary with metadata:', data.metadata);
+            updateSummary(data.metadata);
+            // Auto-show summary panel when data loads
+            document.getElementById('summary').style.display = 'block';
+            document.getElementById('toggleSummaryBtn').textContent = 'Hide Summary';
+          } else {
+            console.log('No metadata in response');
+          }
 
           console.log('Globe update complete');
         })
