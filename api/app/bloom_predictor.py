@@ -1,24 +1,27 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
+import logging
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report
-import joblib
-import os
+from sklearn.metrics import accuracy_score
 import ee
-from collections import defaultdict
-import requests
-import json
-from google.oauth2 import service_account
+import config
 
 class EnhancedBloomPredictor:
     """
     Enhanced bloom predictor that incorporates environmental factors
-    for more accurate future predictions
+    for more accurate future predictions.
     """
     def __init__(self, data_path='../backend/data.csv', use_earth_engine=True):
+        """
+        Initializes the EnhancedBloomPredictor.
+
+        Args:
+            data_path (str, optional): The path to the historical data file. Defaults to '../backend/data.csv'.
+            use_earth_engine (bool, optional): Whether to use Google Earth Engine for environmental data. Defaults to True.
+        """
         self.data_path = data_path
         self.use_earth_engine = use_earth_engine
         self.model = None
@@ -28,108 +31,49 @@ class EnhancedBloomPredictor:
         self.species_patterns = {}
         self.environmental_cache = {}
 
-        # Check if Earth Engine is available (already initialized elsewhere)
         if self.use_earth_engine:
             try:
-                # Test if Earth Engine is already initialized
                 ee.Number(1).getInfo()
-                print("Earth Engine is available and initialized")
-            except:
-                # Try to initialize Earth Engine ourselves
-                try:
-                    # Try with default credentials first (for development)
-                    ee.Initialize()
-                    print("Earth Engine initialized with default credentials")
-                except:
-                    # If that fails, try with service account from environment
-                    try:
-                        import os
-                        import json
-
-                        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
-                        project_id = os.getenv('EE_PROJECT')
-
-                        if credentials_json and project_id:
-                            credentials_dict = json.loads(credentials_json)
-                            SCOPES = [
-                                'https://www.googleapis.com/auth/earthengine',
-                                'https://www.googleapis.com/auth/cloud-platform',
-                                'https://www.googleapis.com/auth/userinfo.email'
-                            ]
-
-                            credentials = service_account.Credentials.from_service_account_info(
-                                credentials_dict,
-                                scopes=SCOPES
-                            )
-
-                            ee.Initialize(credentials=credentials, project=project_id)
-                            print("Earth Engine initialized with service account credentials")
-                        else:
-                            raise Exception("No credentials available")
-                    except:
-                        print("Earth Engine not available, using fallback methods")
-                        self.use_earth_engine = False
+                logging.info("Earth Engine is available and initialized.")
+            except ee.EEException:
+                logging.warning("Earth Engine not available, using fallback methods.")
+                self.use_earth_engine = False
 
         self.load_and_process_data()
         self.build_environmental_features()
         self.train_model()
 
     def load_and_process_data(self):
-        """Load and process historical bloom data"""
+        """Loads and processes historical bloom data from a CSV file."""
         try:
-            # Load CSV data
             df = pd.read_csv(self.data_path)
-
-            # Convert date to datetime
             df['date'] = pd.to_datetime(df['date'])
             df['day_of_year'] = df['date'].dt.dayofyear
             df['year'] = df['date'].dt.year
             df['month'] = df['date'].dt.month
-
-            # Extract location and species info
             df['lat'] = df['latitude'].astype(float)
             df['lon'] = df['longitude'].astype(float)
-
-            # Create bloom indicator (1 if flowering observed)
             df['bloom'] = 1
-
-            # Add state information for regional analysis
             df['state'] = self.get_state_from_coords(df['lat'], df['lon'])
-
-            # Store processed data
             self.historical_data = df
-
-            # Analyze patterns
             self.analyze_patterns()
-
         except Exception as e:
-            print(f"Error loading data: {e}")
+            logging.error(f"Error loading data: {e}")
             self.historical_data = pd.DataFrame()
 
     def get_state_from_coords(self, lat, lon):
-        """Simple state assignment based on coordinates (US only)"""
-        states = []
-
-        for la, lo in zip(lat, lon):
-            if 25 <= la <= 32 and -88 <= lo <= -80:
-                states.append('Florida')
-            elif 32 <= la <= 42 and -125 <= lo <= -114:
-                states.append('California')
-            elif 25 <= la <= 37 and -107 <= lo <= -93:
-                states.append('Texas')
-            elif 40 <= la <= 45 and -80 <= lo <= -71:
-                states.append('New York')
-            else:
-                states.append('Other')
-
-        return states
+        """Assigns a state to a given latitude and longitude."""
+        # This is a simplified implementation. A more robust solution would use a reverse geocoding library.
+        for state, bounds in config.STATE_BOUNDS.items():
+            if bounds['min_lat'] <= lat <= bounds['max_lat'] and bounds['min_lon'] <= lon <= bounds['max_lon']:
+                return state
+        return 'Other'
 
     def analyze_patterns(self):
-        """Analyze historical patterns for prediction"""
+        """Analyzes historical data to find patterns in bloom occurrences."""
         if self.historical_data.empty:
             return
 
-        # Species-specific patterns
         for species in self.historical_data['scientificName'].unique():
             species_data = self.historical_data[self.historical_data['scientificName'] == species]
             self.species_patterns[species] = {
@@ -142,80 +86,58 @@ class EnhancedBloomPredictor:
             }
 
     def get_environmental_data_ee(self, lat, lon, date):
-        """Get environmental data using Google Earth Engine"""
+        """Retrieves environmental data from Google Earth Engine."""
         try:
             point = ee.Geometry.Point([lon, lat])
+            
+            # Temperature
+            lst_collection = ee.ImageCollection('MODIS/061/MOD11A1').filterDate(date - timedelta(days=7), date + timedelta(days=1))
+            lst = lst_collection.select('LST_Day_1km').mean()
+            temperature = lst.reduceRegion(ee.Reducer.mean(), point, 1000).get('LST_Day_1km').getInfo()
+            if temperature:
+                temperature = temperature * 0.02 - 273.15
 
-            # Temperature data (MODIS LST)
-            lst = ee.ImageCollection('MODIS/061/MOD11A1') \
-                .filterDate(date - timedelta(days=7), date + timedelta(days=1)) \
-                .select('LST_Day_1km') \
-                .mean()
+            # Precipitation
+            precip_collection = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY').filterDate(date - timedelta(days=30), date)
+            precip = precip_collection.sum()
+            precipitation = precip.reduceRegion(ee.Reducer.mean(), point, 1000).get('precipitation').getInfo()
 
-            # Precipitation (CHIRPS)
-            precip = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY') \
-                .filterDate(date - timedelta(days=30), date) \
-                .sum()
-
-            # NDVI (vegetation index)
-            ndvi = ee.ImageCollection('MODIS/061/MOD13Q1') \
-                .filterDate(date - timedelta(days=30), date) \
-                .select('NDVI') \
-                .mean()
+            # NDVI
+            ndvi_collection = ee.ImageCollection('MODIS/061/MOD13Q1').filterDate(date - timedelta(days=30), date)
+            ndvi = ndvi_collection.select('NDVI').mean()
+            ndvi_value = ndvi.reduceRegion(ee.Reducer.mean(), point, 1000).get('NDVI').getInfo()
+            if ndvi_value:
+                ndvi_value /= 10000.0
 
             # Elevation
-            elevation = ee.Image('USGS/SRTMGL1_003')
+            elevation = ee.Image('USGS/SRTMGL1_003').reduceRegion(ee.Reducer.mean(), point, 1000).get('elevation').getInfo()
 
-            # Get values at point
-            values = {
-                'temperature': lst.reduceRegion(ee.Reducer.mean(), point, 1000).get('LST_Day_1km'),
-                'precipitation': precip.reduceRegion(ee.Reducer.mean(), point, 1000).get('precipitation'),
-                'ndvi': ndvi.reduceRegion(ee.Reducer.mean(), point, 1000).get('NDVI'),
-                'elevation': elevation.reduceRegion(ee.Reducer.mean(), point, 1000).get('elevation')
+            return {
+                'temperature': temperature or 0.0,
+                'precipitation': precipitation or 0.0,
+                'ndvi': ndvi_value or 0.0,
+                'elevation': elevation or 0.0
             }
 
-            # Convert to Python values
-            result = {}
-            for key, value in values.items():
-                try:
-                    result[key] = float(ee.Number(value).getInfo())
-                except:
-                    result[key] = 0.0
-
-            # Convert temperature from Kelvin to Celsius
-            if 'temperature' in result and result['temperature'] > 0:
-                result['temperature'] = result['temperature'] * 0.02 - 273.15
-
-            return result
-
         except Exception as e:
-            print(f"Error getting EE environmental data: {e}")
+            logging.error(f"Error getting EE data for {lat}, {lon} on {date}: {e}")
             return self.get_environmental_data_fallback(lat, lon, date)
 
     def get_environmental_data_fallback(self, lat, lon, date):
-        """Fallback environmental data when EE is not available"""
-        # Use simplified climate normals based on location and season
+        """Provides fallback environmental data when Earth Engine is not available."""
         month = date.month
         day_of_year = date.timetuple().tm_yday
-
-        # Base temperature by latitude and season
-        base_temp = 15 - abs(lat) * 0.3  # Cooler at higher latitudes
-
-        # Seasonal temperature variation
+        
+        base_temp = 15 - abs(lat) * 0.3
         seasonal_temp = 10 * np.sin(2 * np.pi * (day_of_year - 80) / 365)
-
-        # Precipitation patterns
-        if month in [12, 1, 2]:  # Winter
+        
+        precip = 60 + np.random.normal(0, 25)
+        if month in [12, 1, 2]:
             precip = 50 + np.random.normal(0, 20)
-        elif month in [6, 7, 8]:  # Summer
+        elif month in [6, 7, 8]:
             precip = 80 + np.random.normal(0, 30)
-        else:  # Spring/Fall
-            precip = 60 + np.random.normal(0, 25)
-
-        # NDVI based on season (higher in summer)
+            
         ndvi = 0.3 + 0.4 * np.sin(2 * np.pi * (day_of_year - 80) / 365)
-
-        # Elevation estimate (rough)
         elevation = 100 + abs(lat - 40) * 50
 
         return {
@@ -226,9 +148,8 @@ class EnhancedBloomPredictor:
         }
 
     def get_environmental_data(self, lat, lon, date):
-        """Get environmental data with caching"""
+        """Retrieves environmental data, using a cache if available."""
         cache_key = f"{lat:.2f}_{lon:.2f}_{date.strftime('%Y-%m-%d')}"
-
         if cache_key in self.environmental_cache:
             return self.environmental_cache[cache_key]
 
@@ -236,26 +157,21 @@ class EnhancedBloomPredictor:
             data = self.get_environmental_data_ee(lat, lon, date)
         else:
             data = self.get_environmental_data_fallback(lat, lon, date)
-
+        
         self.environmental_cache[cache_key] = data
         return data
 
     def build_environmental_features(self):
-        """Build environmental features for historical data"""
+        """Builds environmental features for the historical data."""
         if self.historical_data.empty:
             return
 
-        print("Building environmental features...")
-
-        # Sample environmental data for historical observations
+        logging.info("Building environmental features...")
         environmental_features = []
-
         for idx, row in self.historical_data.iterrows():
             if idx % 100 == 0:
-                print(f"Processing {idx}/{len(self.historical_data)} observations...")
-
+                logging.info(f"Processing {idx}/{len(self.historical_data)} observations...")
             env_data = self.get_environmental_data(row['lat'], row['lon'], row['date'])
-
             features = {
                 'lat': row['lat'],
                 'lon': row['lon'],
@@ -266,74 +182,55 @@ class EnhancedBloomPredictor:
                 'family': row['family'],
                 'genus': row['genus'],
                 'state': row['state'],
+                'bloom': row['bloom'],
                 **env_data
             }
-
             environmental_features.append(features)
 
         self.feature_data = pd.DataFrame(environmental_features)
-
-        # Define feature columns for ML
-        self.feature_columns = [
-            'lat', 'lon', 'day_of_year', 'month', 'year',
-            'temperature', 'precipitation', 'ndvi', 'elevation'
-        ]
-
-        print(f"Built features for {len(self.feature_data)} observations")
+        self.feature_columns = ['lat', 'lon', 'day_of_year', 'month', 'year', 'temperature', 'precipitation', 'ndvi', 'elevation']
+        logging.info(f"Built features for {len(self.feature_data)} observations.")
 
     def train_model(self):
-        """Train machine learning model for bloom prediction"""
+        """Trains the bloom prediction model using GridSearchCV to find the best hyperparameters."""
         if self.feature_data is None or self.feature_data.empty:
-            print("No feature data available for training")
+            logging.warning("No feature data available for training.")
             return
 
-        print("Training bloom prediction model...")
-
-        # Prepare features and target
+        logging.info("Training bloom prediction model...")
         X = self.feature_data[self.feature_columns].copy()
-        y = self.feature_data['species'].copy()  # Predict species as proxy for bloom
+        y = self.feature_data['bloom'].copy()
 
-        # Encode categorical target
-        if 'species_encoder' not in self.label_encoders:
-            self.label_encoders['species_encoder'] = LabelEncoder()
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        y_encoded = self.label_encoders['species_encoder'].fit_transform(y)
-
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y_encoded, test_size=0.2, random_state=42
-        )
-
-        # Scale features
         self.scaler = StandardScaler()
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_test_scaled = self.scaler.transform(X_test)
 
-        # Train model
-        self.model = GradientBoostingClassifier(
-            n_estimators=100,
-            max_depth=6,
-            random_state=42
-        )
+        # Define the parameter grid for GridSearchCV
+        param_grid = {
+            'n_estimators': [100, 200],
+            'max_depth': [6, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
 
-        self.model.fit(X_train_scaled, y_train)
+        # Create a GridSearchCV object
+        grid_search = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=3, n_jobs=-1)
+        grid_search.fit(X_train_scaled, y_train)
 
-        # Evaluate
+        # Set the best estimator as the model
+        self.model = grid_search.best_estimator_
+
+        # Evaluate the model on the test set
         y_pred = self.model.predict(X_test_scaled)
         accuracy = accuracy_score(y_test, y_pred)
-
-        print(f"Model trained with accuracy: {accuracy:.3f}")
-
-        # Cross-validation score
-        cv_scores = cross_val_score(self.model, X_train_scaled, y_train, cv=5)
-        print(f"Cross-validation scores: {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})")
+        logging.info(f"Model trained with accuracy: {accuracy:.3f}")
+        logging.info(f"Best hyperparameters: {grid_search.best_params_}")
 
     def predict_blooms_enhanced(self, target_date, aoi_bounds=None, num_predictions=50):
-        """
-        Enhanced prediction using environmental factors and ML model
-        """
+        """Predicts blooms using the enhanced machine learning model."""
         if self.model is None:
-            print("Model not trained, falling back to statistical method")
+            logging.warning("Model not trained, falling back to statistical method.")
             return self.predict_blooms_statistical(target_date, aoi_bounds, num_predictions)
 
         predictions = []
@@ -341,138 +238,72 @@ class EnhancedBloomPredictor:
         target_month = target_date.month
         target_year = target_date.year
 
-        # Set default AOI
         if aoi_bounds is None:
-            aoi_bounds = {
-                'min_lat': 25, 'max_lat': 50,
-                'min_lon': -125, 'max_lon': -65
-            }
+            aoi_bounds = {'min_lat': 25, 'max_lat': 50, 'min_lon': -125, 'max_lon': -65}
 
-        # Generate candidate locations within AOI
+        # Generate random candidate locations within the AOI
         candidate_lats = np.random.uniform(aoi_bounds['min_lat'], aoi_bounds['max_lat'], 200)
         candidate_lons = np.random.uniform(aoi_bounds['min_lon'], aoi_bounds['max_lon'], 200)
 
         for lat, lon in zip(candidate_lats, candidate_lons):
-            # Get environmental conditions
+            # Get environmental data for the candidate location
             env_data = self.get_environmental_data(lat, lon, target_date)
-
-            # Create feature vector
-            features = np.array([[
-                lat, lon, target_day, target_month, target_year,
-                env_data['temperature'], env_data['precipitation'],
-                env_data['ndvi'], env_data['elevation']
-            ]])
-
-            # Scale features
+            
+            # Create a feature vector for the candidate location
+            features = np.array([[lat, lon, target_day, target_month, target_year, env_data['temperature'], env_data['precipitation'], env_data['ndvi'], env_data['elevation']]])
             features_scaled = self.scaler.transform(features)
 
-            # Get prediction probabilities for all species
-            species_probs = self.model.predict_proba(features_scaled)[0]
+            # Predict the probability of a bloom
+            bloom_probability = self.model.predict_proba(features_scaled)[0][1]
 
-            # Find most likely species
-            best_species_idx = np.argmax(species_probs)
-            best_species_prob = species_probs[best_species_idx]
+            # If the bloom probability is above a certain threshold, create a GeoJSON feature for the prediction
+            if bloom_probability > 0.5:
+                # Since we are not predicting species anymore, we will use a generic name
+                species_name = "Algal Bloom"
+                family = "Unknown"
+                genus = "Unknown"
 
-            species_name = self.label_encoders['species_encoder'].inverse_transform([best_species_idx])[0]
-
-            # Get species info
-            species_info = self.species_patterns.get(species_name, {})
-            historical_mean_day = species_info.get('mean_day', target_day)
-
-            # Calculate bloom probability based on environmental suitability
-            # For future predictions, focus on environmental conditions rather than historical timing
-            # Use species probability as base, then modulate by environmental suitability
-            environmental_factor = best_species_prob  # Start with species probability
-
-            # Temperature suitability (species-specific)
-            temp_suitability = self.calculate_temperature_suitability(
-                env_data['temperature'], species_info
-            )
-
-            # Precipitation suitability
-            precip_suitability = self.calculate_precipitation_suitability(
-                env_data['precipitation'], target_month
-            )
-
-            # NDVI suitability (vegetation health indicator)
-            ndvi_suitability = max(0.1, min(1.0, env_data['ndvi'] / 0.8))  # NDVI > 0.8 is very healthy
-
-            # Seasonal timing factor (gentle preference for historical season)
-            seasonal_alignment = 1 - min(1, abs(target_day - historical_mean_day) / 120)  # More lenient: 120 days
-            seasonal_factor = 0.7 + 0.3 * seasonal_alignment  # Base 0.7, up to 1.0
-
-            # Combined probability
-            bloom_probability = (environmental_factor *
-                               temp_suitability *
-                               precip_suitability *
-                               ndvi_suitability *
-                               seasonal_factor)
-
-            if bloom_probability > 0.01:  # Lower threshold for testing
-                # Get species details
-                species_row = self.historical_data[
-                    self.historical_data['scientificName'] == species_name
-                ].iloc[0] if len(self.historical_data[self.historical_data['scientificName'] == species_name]) > 0 else None
-
-                if species_row is not None:
-                    # Determine season
-                    season = self.determine_season(target_day)
-
-                    # Estimate area based on environmental conditions
-                    area = self.estimate_bloom_area(env_data, bloom_probability)
-
-                    feature = {
-                        "type": "Feature",
-                        "properties": {
-                            "Site": species_name,
-                            "Family": species_row['family'],
-                            "Genus": species_row['genus'],
-                            "Season": season,
-                            "Area": area,
-                            "prediction_confidence": bloom_probability,
-                            "predicted_date": target_date.strftime('%Y-%m-%d'),
-                            "is_prediction": True,
-                            "environmental_factors": {
-                                "temperature": env_data['temperature'],
-                                "precipitation": env_data['precipitation'],
-                                "ndvi": env_data['ndvi'],
-                                "elevation": env_data['elevation']
-                            }
-                        },
-                        "geometry": {
-                            "type": "MultiPolygon",
-                            "coordinates": [[[
-                                [lon - 0.01, lat - 0.01],
-                                [lon + 0.01, lat - 0.01],
-                                [lon + 0.01, lat + 0.01],
-                                [lon - 0.01, lat + 0.01],
-                                [lon - 0.01, lat - 0.01]
-                            ]]]
-                        }
+                season = self.determine_season(target_day)
+                area = self.estimate_bloom_area(env_data, bloom_probability)
+                feature = {
+                    "type": "Feature",
+                    "properties": {
+                        "Site": species_name,
+                        "Family": family,
+                        "Genus": genus,
+                        "Season": season,
+                        "Area": area,
+                        "prediction_confidence": bloom_probability,
+                        "predicted_date": target_date.strftime('%Y-%m-%d'),
+                        "is_prediction": True,
+                        "environmental_factors": env_data
+                    },
+                    "geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": [[[
+                            [lon - 0.01, lat - 0.01],
+                            [lon + 0.01, lat - 0.01],
+                            [lon + 0.01, lat + 0.01],
+                            [lon - 0.01, lat + 0.01],
+                            [lon - 0.01, lat - 0.01]
+                        ]]]
                     }
-
-                    predictions.append(feature)
-
-                    if len(predictions) >= num_predictions:
-                        break
-
+                }
+                predictions.append(feature)
+                if len(predictions) >= num_predictions:
+                    break
         return predictions
 
     def predict_blooms_statistical(self, target_date, aoi_bounds=None, num_predictions=100):
-        """Fallback statistical prediction method"""
+        """Fallback statistical prediction method."""
         if self.historical_data.empty:
             return []
 
         target_day = target_date.timetuple().tm_yday
-
         if aoi_bounds is None:
-            aoi_bounds = {
-                'min_lat': 25, 'max_lat': 50,
-                'min_lon': -125, 'max_lon': -65
-            }
+            aoi_bounds = {'min_lat': 25, 'max_lat': 50, 'min_lon': -125, 'max_lon': -65}
 
         predictions = []
-
         for _ in range(num_predictions):
             candidates = self.historical_data[
                 (self.historical_data['lat'] >= aoi_bounds['min_lat']) &
@@ -480,7 +311,6 @@ class EnhancedBloomPredictor:
                 (self.historical_data['lon'] >= aoi_bounds['min_lon']) &
                 (self.historical_data['lon'] <= aoi_bounds['max_lon'])
             ]
-
             if candidates.empty:
                 continue
 
@@ -493,13 +323,8 @@ class EnhancedBloomPredictor:
             if np.random.random() < probability:
                 lat_noise = np.random.normal(0, 0.5)
                 lon_noise = np.random.normal(0, 0.5)
-
-                predicted_lat = sample['lat'] + lat_noise
-                predicted_lon = sample['lon'] + lon_noise
-
-                predicted_lat = np.clip(predicted_lat, aoi_bounds['min_lat'], aoi_bounds['max_lat'])
-                predicted_lon = np.clip(predicted_lon, aoi_bounds['min_lon'], aoi_bounds['max_lon'])
-
+                predicted_lat = np.clip(sample['lat'] + lat_noise, aoi_bounds['min_lat'], aoi_bounds['max_lat'])
+                predicted_lon = np.clip(sample['lon'] + lon_noise, aoi_bounds['min_lon'], aoi_bounds['max_lon'])
                 area = np.random.lognormal(10, 1)
                 season = self.determine_season(target_day)
 
@@ -526,57 +351,40 @@ class EnhancedBloomPredictor:
                         ]]]
                     }
                 }
-
                 predictions.append(feature)
-
         return predictions
 
     def calculate_temperature_suitability(self, temperature, species_info):
-        """Calculate how suitable temperature is for blooming"""
-        # Simple temperature suitability model
-        optimal_temp = 20  # Assume 20°C is optimal for most blooms
-        temp_range = 15   # Acceptable range
-
+        """Calculates the suitability of the temperature for a bloom."""
+        optimal_temp = 20
+        temp_range = 15
         suitability = 1 - min(1, abs(temperature - optimal_temp) / temp_range)
-        return max(0.1, suitability)  # Minimum suitability
+        return max(0.1, suitability)
 
     def calculate_precipitation_suitability(self, precipitation, month):
-        """Calculate precipitation suitability"""
-        # Seasonal precipitation expectations
-        if month in [12, 1, 2]:  # Winter - lower precipitation
+        """Calculates the suitability of the precipitation for a bloom."""
+        if month in [12, 1, 2]:
             optimal_precip = 40
-        elif month in [6, 7, 8]:  # Summer - higher precipitation
+        elif month in [6, 7, 8]:
             optimal_precip = 70
-        else:  # Spring/Fall - moderate
+        else:
             optimal_precip = 55
-
         precip_range = 30
         suitability = 1 - min(1, abs(precipitation - optimal_precip) / precip_range)
         return max(0.1, suitability)
 
     def estimate_bloom_area(self, env_data, probability):
-        """Estimate bloom area based on environmental conditions"""
-        # Base area influenced by environmental factors
-        base_area = 1000  # sq meters
-
-        # Temperature effect
+        """Estimates the area of a bloom based on environmental conditions."""
+        base_area = 1000
         temp_factor = 1 + (env_data['temperature'] - 15) * 0.02
-
-        # Precipitation effect
         precip_factor = 1 + (env_data['precipitation'] - 50) * 0.005
-
-        # NDVI effect (vegetation health)
         ndvi_factor = 1 + env_data['ndvi'] * 0.5
-
-        # Probability effect
         prob_factor = probability
-
         estimated_area = base_area * temp_factor * precip_factor * ndvi_factor * prob_factor
-
         return max(100, min(10000, estimated_area))
 
     def determine_season(self, day_of_year):
-        """Determine season from day of year"""
+        """Determines the season from the day of the year."""
         if 80 <= day_of_year <= 172:
             return 'Spring'
         elif 173 <= day_of_year <= 265:
@@ -587,31 +395,15 @@ class EnhancedBloomPredictor:
             return 'Winter'
 
     def predict_blooms_for_date(self, target_date, aoi_bounds=None, num_predictions=50):
-        """Main prediction method - uses enhanced method if available"""
+        """Main prediction method - uses enhanced method if available."""
         return self.predict_blooms_enhanced(target_date, aoi_bounds, num_predictions)
 
     def predict_blooms_time_series(self, start_date, end_date, aoi_bounds=None, interval_days=7):
-        """Generate bloom predictions for a time series"""
+        """Generates bloom predictions for a time series."""
         predictions = {}
         current_date = start_date
-
         while current_date <= end_date:
             daily_predictions = self.predict_blooms_for_date(current_date, aoi_bounds)
             predictions[current_date.strftime('%Y-%m-%d')] = daily_predictions
             current_date += timedelta(days=interval_days)
-
         return predictions
-
-def create_geojson_from_predictions(predictions_dict):
-    """Convert predictions dict to GeoJSON FeatureCollection"""
-    all_features = []
-
-    for date, features in predictions_dict.items():
-        for feature in features:
-            feature['properties']['date'] = date
-            all_features.append(feature)
-
-    return {
-        "type": "FeatureCollection",
-        "features": all_features
-    }

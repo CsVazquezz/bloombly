@@ -1,161 +1,231 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
+import logging
 from bloom_predictor import EnhancedBloomPredictor
+from bloom_predictor_v2 import ImprovedBloomPredictor
+import config
+from models.schemas import BloomsPredictionQuery, EnvironmentalDataQuery
+from pydantic import ValidationError
 
 predict_bp = Blueprint('predict', __name__)
 
-# Initialize predictor (lazy loading)
 predictor = None
+predictor_v2 = None
 
-def get_predictor():
-    global predictor
+def get_predictor(version='v1'):
+    """Initializes and returns the bloom predictor instance."""
+    global predictor, predictor_v2
+    
+    if version == 'v2':
+        if predictor_v2 is None:
+            logging.info("Initializing Improved Bloom Predictor v2 (Learning Bloom Dynamics)...")
+            try:
+                predictor_v2 = ImprovedBloomPredictor()
+                logging.info("✓ Bloom Predictor v2 ready!")
+                return predictor_v2
+            except Exception as e:
+                logging.error(f"⚠ Failed to initialize v2: {e}")
+                logging.info("  Falling back to v1...")
+                version = 'v1'
+        else:
+            return predictor_v2
+    
+    # v1 (default)
     if predictor is None:
-        print("Initializing Enhanced Bloom Predictor...")
+        logging.info("Initializing Enhanced Bloom Predictor v1...")
         predictor = EnhancedBloomPredictor()
-        print("Enhanced Bloom Predictor ready!")
+        logging.info("✓ Bloom Predictor v1 ready!")
     return predictor
+
+def get_aoi_bounds(aoi_type, aoi_state, aoi_country, bbox):
+    """Returns the bounding box for a given AOI."""
+    if aoi_type == 'state' and aoi_state in config.STATE_BOUNDS:
+        return config.STATE_BOUNDS[aoi_state]
+    if aoi_type == 'country' and aoi_country.lower() in config.COUNTRY_BOUNDS:
+        return config.COUNTRY_BOUNDS[aoi_country.lower()]
+    if aoi_type == 'bbox' and bbox and len(bbox) == 4:
+        return {'min_lon': bbox[0], 'min_lat': bbox[1], 'max_lon': bbox[2], 'max_lat': bbox[3]}
+    return None
+
+def create_geojson_response(features, metadata):
+    """Creates a GeoJSON FeatureCollection response."""
+    return jsonify({
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": metadata
+    })
 
 @predict_bp.route('/blooms', methods=['GET'])
 def predict_blooms():
+    """Predicts blooms for a given date or date range."""
     try:
-        # Get parameters
-        aoi_type = request.args.get('aoi_type', 'global')
-        date_str = request.args.get('date')
-        start_date_str = request.args.get('start_date')
-        end_date_str = request.args.get('end_date')
-        aoi_country = request.args.get('aoi_country', '')
-        aoi_state = request.args.get('aoi_state', '')
-        prediction_method = request.args.get('method', 'enhanced')  # 'enhanced' or 'statistical'
+        query_params = BloomsPredictionQuery(**request.args)
+    except ValidationError as e:
+        logging.error(f"Validation error in /blooms endpoint: {e.errors()}")
+        return jsonify(error=e.errors()), 400
 
-        predictor = get_predictor()
+    try:
+        # Determine which model version to use
+        version = 'v2' if query_params.method in ['v2', 'bloom_dynamics'] else 'v1'
+        predictor = get_predictor(version)
+        aoi_bounds = get_aoi_bounds(query_params.aoi_type, query_params.aoi_state, query_params.aoi_country, query_params.bbox)
+        
+        confidence_threshold = float(request.args.get('confidence', '0.3'))
 
-        # Set AOI bounds based on type
-        aoi_bounds = None
-        if aoi_type == 'state':
-            # Define rough bounds for common states
-            state_bounds = {
-                'Texas': {'min_lat': 25.8, 'max_lat': 36.5, 'min_lon': -106.6, 'max_lon': -93.5},
-                'California': {'min_lat': 32.5, 'max_lat': 42.0, 'min_lon': -124.4, 'max_lon': -114.1},
-                'Florida': {'min_lat': 24.5, 'max_lat': 31.0, 'min_lon': -87.6, 'max_lon': -79.8},
-                'New York': {'min_lat': 40.5, 'max_lat': 45.0, 'min_lon': -79.8, 'max_lon': -71.8}
-            }
-            aoi_bounds = state_bounds.get(aoi_state)
-        elif aoi_type == 'country':
-            # Rough US bounds
-            if aoi_country.lower() in ['united states', 'usa', 'us']:
-                aoi_bounds = {'min_lat': 24.4, 'max_lat': 49.4, 'min_lon': -125.0, 'max_lon': -66.9}
-            elif aoi_country.lower() == 'mexico':
-                aoi_bounds = {'min_lat': 14.5, 'max_lat': 32.7, 'min_lon': -118.4, 'max_lon': -86.7}
-
-        if date_str:
-            # Single date prediction
-            target_date = datetime.strptime(date_str, '%Y-%m-%d')
-
-            if prediction_method == 'statistical':
-                predictions = predictor.predict_blooms_statistical(target_date, aoi_bounds, num_predictions=50)
+        if query_params.date:
+            target_date = query_params.date
+            
+            if version == 'v2':
+                # Use improved bloom dynamics model
+                predictions = predictor.predict_blooms_for_date(
+                    target_date, 
+                    aoi_bounds, 
+                    num_predictions=100,
+                    confidence_threshold=confidence_threshold
+                )
+                model_info = "ML model trained on bloom dynamics with temporal features and environmental factors (v2)"
+            elif query_params.method == 'statistical':
+                predictions = predictor.predict_blooms_statistical(target_date, aoi_bounds, config.NUM_PREDICTIONS)
+                model_info = "Statistical sampling from historical data"
             else:
-                predictions = predictor.predict_blooms_enhanced(target_date, aoi_bounds, num_predictions=50)
+                predictions = predictor.predict_blooms_enhanced(target_date, aoi_bounds, config.NUM_PREDICTIONS)
+                model_info = "Enhanced ML model with environmental factors (v1)"
+            
+            metadata = {
+                "prediction_date": query_params.date.isoformat(),
+                "aoi_type": query_params.aoi_type,
+                "prediction_type": "single_date",
+                "method": query_params.method,
+                "model_version": version,
+                "confidence_threshold": confidence_threshold if version == 'v2' else None,
+                "model_info": model_info
+            }
+            return create_geojson_response(predictions, metadata)
 
-            return jsonify({
-                "type": "FeatureCollection",
-                "features": predictions,
-                "metadata": {
-                    "prediction_date": date_str,
-                    "aoi_type": aoi_type,
-                    "prediction_type": "single_date",
-                    "method": prediction_method,
-                    "model_info": "Enhanced ML model with environmental factors" if prediction_method == 'enhanced' else "Statistical sampling from historical data"
-                }
-            })
+        elif query_params.start_date and query_params.end_date:
+            start_date = query_params.start_date
+            end_date = query_params.end_date
 
-        elif start_date_str and end_date_str:
-            # Time series prediction
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-
-            # Limit to reasonable range (max 90 days)
-            if (end_date - start_date).days > 90:
-                end_date = start_date + timedelta(days=90)
+            if (end_date - start_date).days > config.MAX_TIME_SERIES_DAYS:
+                end_date = start_date + timedelta(days=config.MAX_TIME_SERIES_DAYS)
 
             predictions = predictor.predict_blooms_time_series(
-                start_date, end_date, aoi_bounds, interval_days=7
+                start_date, end_date, aoi_bounds, config.TIME_SERIES_INTERVAL_DAYS
             )
-
-            # Convert to GeoJSON
-            all_features = []
-            for date, features in predictions.items():
-                for feature in features:
-                    feature['properties']['date'] = date
-                    all_features.append(feature)
-
-            return jsonify({
-                "type": "FeatureCollection",
-                "features": all_features,
-                "metadata": {
-                    "start_date": start_date_str,
-                    "end_date": end_date_str,
-                    "aoi_type": aoi_type,
-                    "prediction_type": "time_series",
-                    "interval_days": 7,
-                    "method": prediction_method,
-                    "model_info": "Enhanced ML model with environmental factors" if prediction_method == 'enhanced' else "Statistical sampling from historical data"
-                }
-            })
+            
+            all_features = [feature for date in predictions for feature in predictions[date]]
+            
+            metadata = {
+                "start_date": query_params.start_date.isoformat(),
+                "end_date": query_params.end_date.isoformat(),
+                "aoi_type": query_params.aoi_type,
+                "prediction_type": "time_series",
+                "interval_days": config.TIME_SERIES_INTERVAL_DAYS,
+                "method": query_params.method,
+                "model_info": "Enhanced ML model with environmental factors" if query_params.method == 'enhanced' else "Statistical sampling from historical data"
+            }
+            return create_geojson_response(all_features, metadata)
 
         else:
-            return jsonify({"error": "Must provide either 'date' for single prediction or 'start_date' and 'end_date' for time series"}), 400
+            return jsonify(error="Must provide either 'date' or both 'start_date' and 'end_date'"), 400
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"API Error in /blooms endpoint: {e}")
+        return jsonify(error="An unexpected error occurred."), 500
 
 @predict_bp.route('/environmental', methods=['GET'])
 def get_environmental_data():
     """Get environmental data for a specific location and date"""
     try:
-        lat = float(request.args.get('lat'))
-        lon = float(request.args.get('lon'))
-        date_str = request.args.get('date')
+        query_params = EnvironmentalDataQuery(**request.args)
+    except ValidationError as e:
+        logging.error(f"Validation error in /environmental endpoint: {e.errors()}")
+        return jsonify(error=e.errors()), 400
 
-        if not date_str:
-            return jsonify({"error": "Date parameter is required"}), 400
-
-        target_date = datetime.strptime(date_str, '%Y-%m-%d')
+    try:
         predictor = get_predictor()
-
-        env_data = predictor.get_environmental_data(lat, lon, target_date)
+        env_data = predictor.get_environmental_data(query_params.lat, query_params.lon, query_params.date)
 
         return jsonify({
-            "location": {"lat": lat, "lon": lon},
-            "date": date_str,
+            "location": {"lat": query_params.lat, "lon": query_params.lon},
+            "date": query_params.date.isoformat(),
             "environmental_data": env_data,
             "data_source": "earth_engine" if predictor.use_earth_engine else "climate_normals"
         })
 
-    except ValueError as e:
-        return jsonify({"error": "Invalid latitude, longitude, or date format"}), 400
     except Exception as e:
+        logging.error(f"API Error in /environmental endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
 @predict_bp.route('/model-info', methods=['GET'])
 def get_model_info():
     """Get information about the prediction model"""
     try:
-        predictor = get_predictor()
-
-        model_info = {
-            "model_type": "Enhanced Gradient Boosting Classifier",
-            "features": predictor.feature_columns if hasattr(predictor, 'feature_columns') else [],
-            "training_data_size": len(predictor.historical_data) if not predictor.historical_data.empty else 0,
-            "species_count": len(predictor.species_patterns),
-            "environmental_data_source": "Google Earth Engine" if predictor.use_earth_engine else "Climate Normals",
-            "environmental_factors": [
-                "temperature", "precipitation", "ndvi", "elevation"
-            ],
-            "prediction_methods": ["enhanced", "statistical"],
-            "supported_states": ["Texas", "California", "Florida", "New York"]
-        }
+        version = request.args.get('version', 'v2')
+        predictor = get_predictor(version)
+        
+        if version == 'v2':
+            # Get bloom windows info
+            bloom_windows = {}
+            for species, info in predictor.species_bloom_windows.items():
+                bloom_windows[species] = {
+                    'peak_day': int(info['mean_day']),
+                    'range_days': [int(info['min_day']), int(info['max_day'])],
+                    'observation_count': info['count']
+                }
+            
+            model_info = {
+                "model_version": "v2",
+                "model_type": "Gradient Boosting Classifier (Bloom Dynamics)",
+                "description": "ML model trained on bloom vs no-bloom classification with temporal features",
+                "features": predictor.feature_columns if hasattr(predictor, 'feature_columns') else [],
+                "feature_count": len(predictor.feature_columns) if hasattr(predictor, 'feature_columns') else 0,
+                "training_data": {
+                    "positive_examples": len(predictor.historical_blooms) if hasattr(predictor, 'historical_blooms') else 0,
+                    "negative_examples": len(predictor.negative_examples) if hasattr(predictor, 'negative_examples') else 0,
+                    "total_samples": len(predictor.feature_data) if hasattr(predictor, 'feature_data') else 0
+                },
+                "species_bloom_windows": bloom_windows,
+                "species_count": len(predictor.species_bloom_windows),
+                "environmental_data_source": "Google Earth Engine (30-day averages)" if predictor.use_earth_engine else "Climate Normals",
+                "environmental_factors": [
+                    "temperature (mean, max, min, range)",
+                    "precipitation (total, mean)",
+                    "ndvi (mean, max, trend)",
+                    "elevation",
+                    "growing_degree_days",
+                    "moisture_index",
+                    "vegetation_health"
+                ],
+                "prediction_methods": ["v2 (bloom_dynamics)", "enhanced (v1)", "statistical (v1)"],
+                "validation": "Time-series cross-validation with ROC-AUC metric",
+                "improvements_over_v1": [
+                    "Predicts bloom probability directly (not species as proxy)",
+                    "Trained on both bloom and no-bloom examples",
+                    "Temporal feature engineering (lag, trends, seasonal encoding)",
+                    "Environmental data aggregated over 30-day windows",
+                    "Time-series aware validation"
+                ]
+            }
+        else:
+            # v1 model info
+            model_info = {
+                "model_version": "v1",
+                "model_type": "Enhanced Gradient Boosting Classifier",
+                "features": predictor.feature_columns if hasattr(predictor, 'feature_columns') else [],
+                "training_data_size": len(predictor.historical_data) if hasattr(predictor, 'historical_data') and not predictor.historical_data.empty else 0,
+                "species_count": len(predictor.species_patterns),
+                "environmental_data_source": "Google Earth Engine" if predictor.use_earth_engine else "Climate Normals",
+                "environmental_factors": [
+                    "temperature", "precipitation", "ndvi", "elevation"
+                ],
+                "prediction_methods": ["enhanced", "statistical"],
+                "supported_states": ["Texas", "California", "Florida", "New York"]
+            }
 
         return jsonify(model_info)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
