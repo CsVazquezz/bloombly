@@ -42,7 +42,7 @@ class ImprovedBloomPredictor:
     5. Time-series aware validation
     """
     
-    def __init__(self, data_path='../backend/data.csv', use_earth_engine=True, 
+    def __init__(self, data_path='../data/raw/data.csv', use_earth_engine=True, 
                  load_pretrained=None):
         """
         Initialize Bloom Predictor

@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
 from bloom_predictor_v2 import ImprovedBloomPredictor
 
-def train_and_save_model(data_path='backend/data.csv', 
+def train_and_save_model(data_path='../data/raw/data.csv', 
                          model_output='app/bloom_model_v2.pkl',
                          use_earth_engine=False,
                          n_estimators=200,
@@ -168,8 +168,8 @@ Examples:
     parser.add_argument(
         '--data',
         type=str,
-        default='../backend/data.csv',
-        help='Path to bloom observation CSV file (default: ../backend/data.csv)'
+        default='../data/raw/data.csv',
+        help='Path to bloom observation CSV file (default: ../data/raw/data.csv)'
     )
     
     parser.add_argument(
