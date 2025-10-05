@@ -1,5 +1,6 @@
 /* Left Sidebar - Dataset Controls */
-#dataset-legend {
+#dataset-legend,
+#unified-legend {
   position: absolute;
   top: 40px;
   left: 20px;
@@ -9,11 +10,61 @@
   border-radius: 12px;
   font-size: 11px;
   max-height: calc(100vh - 60px);
-  overflow-y: auto;
   width: 160px;
   pointer-events: none;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Scrollable Content Area */
+#scrollableContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-bottom: 12px;
+  min-height: 0;
+}
+
+/* Fixed Controls at Bottom */
+#fixedControls {
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Mode Switcher Styles */
+.mode-switcher-container {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 6px 8px;
+  background: #121418;
+  border: 2px solid rgba(78, 217, 217, 0.3);
+  border-radius: 8px;
+  color: #9CA3AF;
+  font-size: 11px;
+  font-weight: 200;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.mode-btn:hover {
+  background: #1B1F25;
+  border-color: rgba(78, 217, 217, 0.5);
+}
+
+.mode-btn.active {
+  background: #4ED9D9;
+  color: #0F1115;
+  border-color: #4ED9D9;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(78, 217, 217, 0.3);
 }
 
 /* Load Dataset Button Styles */
@@ -75,7 +126,8 @@
   }
 }
 
-#datasetColorsLegend {
+#datasetColorsLegend,
+#unifiedColorsLegend {
   position: absolute;
   left: 200px;
   bottom: 30px;
@@ -164,12 +216,14 @@
 
 #colorsLegend *,
 #datasetColorsLegend *,
+#unifiedColorsLegend *,
 #predColorsLegend * {
   pointer-events: auto;
 }
 
 #colorsLegend h4,
 #datasetColorsLegend h4,
+#unifiedColorsLegend h4,
 #predColorsLegend h4 {
   margin: 0 0 8px 0;
   font-size: 11px;
@@ -217,12 +271,14 @@
 /* Custom scrollbar for colors legend */
 #colorsLegend::-webkit-scrollbar,
 #datasetColorsLegend::-webkit-scrollbar,
+#unifiedColorsLegend::-webkit-scrollbar,
 #predColorsLegend::-webkit-scrollbar {
   width: 4px;
 }
 
 #colorsLegend::-webkit-scrollbar-track,
 #datasetColorsLegend::-webkit-scrollbar-track,
+#unifiedColorsLegend::-webkit-scrollbar-track,
 #predColorsLegend::-webkit-scrollbar-track {
   background: #1B1F25;
   border-radius: 2px;
@@ -230,6 +286,7 @@
 
 #colorsLegend::-webkit-scrollbar-thumb,
 #datasetColorsLegend::-webkit-scrollbar-thumb,
+#unifiedColorsLegend::-webkit-scrollbar-thumb,
 #predColorsLegend::-webkit-scrollbar-thumb {
   background: rgba(78, 217, 217, 0.4);
   border-radius: 2px;
@@ -237,12 +294,33 @@
 
 #colorsLegend::-webkit-scrollbar-thumb:hover,
 #datasetColorsLegend::-webkit-scrollbar-thumb:hover,
+#unifiedColorsLegend::-webkit-scrollbar-thumb:hover,
 #predColorsLegend::-webkit-scrollbar-thumb:hover {
+  background: rgba(78, 217, 217, 0.6);
+}
+
+/* Custom scrollbar for scrollable content */
+#scrollableContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+#scrollableContent::-webkit-scrollbar-track {
+  background: #1B1F25;
+  border-radius: 3px;
+}
+
+#scrollableContent::-webkit-scrollbar-thumb {
+  background: rgba(78, 217, 217, 0.4);
+  border-radius: 3px;
+}
+
+#scrollableContent::-webkit-scrollbar-thumb:hover {
   background: rgba(78, 217, 217, 0.6);
 }
 
 #legend *,
 #dataset-legend *,
+#unified-legend *,
 #prediction-legend * {
   pointer-events: auto;
 }

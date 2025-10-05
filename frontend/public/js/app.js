@@ -2,16 +2,14 @@ import { CONFIG } from './config.js';
 import { state, initializeFamilyColors } from './state.js';
 import { initGlobe, createPointFromFeature, initializeClouds, switchToPointsMode, loadCountryBorders } from './globe.js';
 import { initTopSelector } from './components/topSelector.js';
-import { initDatasetSidebar } from './components/datasetSidebar.js';
-import { initPredictionSidebar } from './components/predictionSidebar.js';
+import { initUnifiedSidebar } from './components/unifiedSidebar.js';
 import { initTimeline, buildTimelineSteps } from './components/timeline.js';
 
 // Initialize the application
 async function init() {
   // Initialize components
   initTopSelector();
-  initDatasetSidebar();
-  initPredictionSidebar();
+  initUnifiedSidebar();
   initTimeline();
   
   // Initialize globe
@@ -22,7 +20,7 @@ async function init() {
   await loadCountryBorders();
   
   // Note: Data is now loaded via sidebar buttons, not automatically
-  console.log('Application initialized. Use sidebars to load data.');
+  console.log('Application initialized. Use unified sidebar to load data or predictions.');
 }
 
 // Legacy function - kept for reference but no longer used on init
