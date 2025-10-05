@@ -87,10 +87,34 @@ class SakuraModelEvaluator:
         prunus_data = self.data[self.data['genus'] == 'Prunus'].copy()
         
         # Prepare features
-        X = prunus_data[features].fillna(prunus_data[features].median())
+        X = prunus_data[features].copy()
+        
+        # Drop columns that are entirely NaN
+        all_nan_cols = X.columns[X.isna().all()].tolist()
+        if all_nan_cols:
+            print(f"  ⚠ Dropping {len(all_nan_cols)} columns with all NaN values: {all_nan_cols[:5]}...")
+            X = X.drop(columns=all_nan_cols)
+            # Update features list to match
+            features_to_use = [f for f in features if f not in all_nan_cols]
+        else:
+            features_to_use = features
+        
+        # Fill remaining NaN values with median
+        X = X.fillna(X.median())
+        
+        # Fill any remaining NaN (in case median is still NaN) with 0
+        X = X.fillna(0)
+        
         y = prunus_data['bloom_day_of_year']
         
-        X_scaled = scaler.transform(X)
+        # Scale features - need to handle potential dimension mismatch
+        if len(all_nan_cols) > 0:
+            # Create a full feature matrix with zeros for dropped columns
+            X_full = pd.DataFrame(0, index=X.index, columns=features)
+            X_full[features_to_use] = X
+            X_scaled = scaler.transform(X_full)
+        else:
+            X_scaled = scaler.transform(X)
         
         # Predictions
         y_pred = model.predict(X_scaled)
@@ -156,10 +180,34 @@ class SakuraModelEvaluator:
             japan_data = pd.concat([japan_data, japan_region_data]).drop_duplicates()
         
         # Prepare features
-        X = japan_data[features].fillna(japan_data[features].median())
+        X = japan_data[features].copy()
+        
+        # Drop columns that are entirely NaN
+        all_nan_cols = X.columns[X.isna().all()].tolist()
+        if all_nan_cols:
+            print(f"  ⚠ Dropping {len(all_nan_cols)} columns with all NaN values: {all_nan_cols[:5]}...")
+            X = X.drop(columns=all_nan_cols)
+            # Update features list to match
+            features_to_use = [f for f in features if f not in all_nan_cols]
+        else:
+            features_to_use = features
+        
+        # Fill remaining NaN values with median
+        X = X.fillna(X.median())
+        
+        # Fill any remaining NaN (in case median is still NaN) with 0
+        X = X.fillna(0)
+        
         y = japan_data['bloom_day_of_year']
         
-        X_scaled = scaler.transform(X)
+        # Scale features - need to handle potential dimension mismatch
+        if len(all_nan_cols) > 0:
+            # Create a full feature matrix with zeros for dropped columns
+            X_full = pd.DataFrame(0, index=X.index, columns=features)
+            X_full[features_to_use] = X
+            X_scaled = scaler.transform(X_full)
+        else:
+            X_scaled = scaler.transform(X)
         
         # Predictions
         y_pred = model.predict(X_scaled)
