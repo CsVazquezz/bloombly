@@ -49,6 +49,9 @@ data-processing/processed/
 # *.xlsx - commented out so datasets are included
 !WildflowerBlooms_AreaOfInterest.geojson
 
+# Ignore large GeoJSON files (>100MB GitHub limit)
+data/geojson/flowering_sites.geojson
+
 # Machine Learning
 ml-models/notebooks/.ipynb_checkpoints/
 ml-models/trained-models/
