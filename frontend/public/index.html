@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLOBE Observer Bloom Events</title>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Component Styles -->
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="stylesheet" href="/styles/sidebar.css">
+  <link rel="stylesheet" href="/styles/timeline.css">
+</head>
+<body>
+  <div id="globeViz"></div>
+  
+  <!-- Sidebar Component -->
+  <div id="sidebar-container"></div>
+  
+  <!-- Timeline Component -->
+  <div id="timeline-container"></div>
+
+  <!-- External Libraries -->
+  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+
+  <!-- Application Scripts -->
+  <script type="module" src="/js/config.js"></script>
+  <script type="module" src="/js/state.js"></script>
+  <script type="module" src="/js/globe.js"></script>
+  <script type="module" src="/js/components/sidebar.js"></script>
+  <script type="module" src="/js/components/timeline.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
