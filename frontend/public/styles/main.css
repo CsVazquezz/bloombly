@@ -1,9 +1,10 @@
-body { 
-  margin: 0; 
+body {
+  margin: 0;
   font-family: Arial, sans-serif;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
 }
 
-#globeViz { 
-  width: 100vw; 
-  height: 100vh; 
+#globeViz {
+  width: 100vw;
+  height: 100vh;
 }
