@@ -22,6 +22,9 @@ export function showDescriptionCard(point, event, coords) {
   const familyColor = state.familyColors[point.Family] || '#4ED9D9';
   const genusColor = state.genusColors[point.Genus] || familyColor;
   
+  // Get the genus image path
+  const genusImagePath = point.Genus ? `../images/${point.Genus}.png` : null;
+  
   card.innerHTML = `
     <div class="card-header">
       <h3>Bloom Details</h3>
@@ -29,8 +32,15 @@ export function showDescriptionCard(point, event, coords) {
     </div>
     
     <div class="card-content">
-      <div class="info-section">
-        <div class="info-row">
+      ${genusImagePath ? `
+        <div class="genus-image-container">
+          <img src="${genusImagePath}" alt="${point.Genus}" class="genus-image" 
+               onerror="this.style.display='none'; this.parentElement.style.display='none';">
+        </div>
+      ` : ''}
+      
+      <div class="taxonomy-row">
+        <div class="taxonomy-item">
           <span class="label">Family</span>
           <div class="value-with-color">
             <div class="color-indicator" style="background-color: ${familyColor};"></div>
@@ -38,40 +48,36 @@ export function showDescriptionCard(point, event, coords) {
           </div>
         </div>
         
-        <div class="info-row">
+        <div class="taxonomy-item">
           <span class="label">Genus</span>
           <div class="value-with-color">
             <div class="color-indicator" style="background-color: ${genusColor};"></div>
             <span class="value">${point.Genus || 'N/A'}</span>
           </div>
         </div>
-        
-        <div class="info-row">
+      </div>
+      
+      <div class="data-row">
+        <div class="data-item">
           <span class="label">Area</span>
           <span class="value">${point.Area ? point.Area.toFixed(2) + ' km²' : 'N/A'}</span>
         </div>
-      </div>
-      
-      <div class="info-section">
-        <h4>Location</h4>
-        <div class="info-row">
+        
+        <div class="data-item">
           <span class="label">Latitude</span>
           <span class="value">${point.lat ? point.lat.toFixed(4) + '°' : 'N/A'}</span>
         </div>
         
-        <div class="info-row">
+        <div class="data-item">
           <span class="label">Longitude</span>
           <span class="value">${point.lng ? point.lng.toFixed(4) + '°' : 'N/A'}</span>
         </div>
       </div>
       
       ${point.confidence ? `
-        <div class="info-section prediction-section">
-          <h4>Prediction Info</h4>
-          <div class="info-row">
-            <span class="label">Confidence</span>
-            <span class="value confidence-value">${(point.confidence * 100).toFixed(1)}%</span>
-          </div>
+        <div class="data-item">
+          <span class="label">Confidence</span>
+          <span class="value confidence-value">${(point.confidence * 100).toFixed(1)}%</span>
         </div>
       ` : ''}
     </div>

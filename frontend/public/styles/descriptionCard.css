@@ -83,6 +83,31 @@
   max-height: calc(100vh - 320px);
 }
 
+/* Genus Image Container */
+.genus-image-container {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  background: rgba(18, 20, 24, 0.7);
+  border-radius: 8px;
+  padding: 12px;
+  border: none;
+}
+
+.genus-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+.genus-image:hover {
+  transform: scale(1.02);
+}
+
 /* Custom scrollbar for card content */
 .card-content::-webkit-scrollbar {
   width: 6px;
@@ -109,44 +134,89 @@
   gap: 8px;
 }
 
+/* Taxonomy Section (Family & Genus) */
+.taxonomy-section {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+}
+
+.taxonomy-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.taxonomy-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Physical Data Section */
+.physical-data-section {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+}
+
+.data-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.data-item {
+  flex: 1;
+  min-width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .info-section h4 {
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 11px;
   font-weight: 200;
   color: #FFFFFF;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
-/* Info Rows */
+/* Info Rows - Legacy (removed card styling) */
 .info-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 12px 14px;
-  background: rgba(18, 20, 24, 0.7);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s ease;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  transition: none;
   gap: 4px;
 }
 
 .info-row:hover {
-  background: rgba(27, 31, 37, 0.85);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  border-color: transparent;
   box-shadow: none;
 }
 
-.info-row .label {
-  font-size: 11px;
-  color: #FFFFFF;
+/* Labels and Values - Plain Display */
+.label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
   font-weight: 200;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
-.info-row .value {
+.value {
   font-size: 13px;
   color: #FFFFFF;
   font-weight: 400;
@@ -173,10 +243,10 @@
 
 /* Prediction Section Styling */
 .prediction-section {
-  background: rgba(255, 255, 255, 0.05);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border: none;
 }
 
 .prediction-section h4 {
@@ -197,17 +267,16 @@
   }
 }
 
-/* Animation for first info section */
-.info-section:first-child .info-row {
+/* Animation for sections */
+.info-section {
   animation: fadeInUp 0.4s ease forwards;
   opacity: 0;
 }
 
-.info-section:first-child .info-row:nth-child(1) { animation-delay: 0.1s; }
-.info-section:first-child .info-row:nth-child(2) { animation-delay: 0.15s; }
-.info-section:first-child .info-row:nth-child(3) { animation-delay: 0.2s; }
-.info-section:first-child .info-row:nth-child(4) { animation-delay: 0.25s; }
-.info-section:first-child .info-row:nth-child(5) { animation-delay: 0.3s; }
+.info-section:nth-child(1) { animation-delay: 0.1s; }
+.info-section:nth-child(2) { animation-delay: 0.15s; }
+.info-section:nth-child(3) { animation-delay: 0.2s; }
+.info-section:nth-child(4) { animation-delay: 0.25s; }
 
 @keyframes fadeInUp {
   from {
