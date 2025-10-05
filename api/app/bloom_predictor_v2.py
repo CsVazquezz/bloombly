@@ -372,14 +372,34 @@ class ImprovedBloomPredictor:
                 'ndvi_trend': self._safe_extract(ndvi_trend, point, scale, 'scale'),
                 'elevation': self._safe_extract(elevation, point, scale, 'elevation'),
                 
-                # Add comprehensive data from time series
+                # Add comprehensive data from time series (includes all new features)
                 'ndvi_time_series': comprehensive_data.get('ndvi_time_series', []),
                 'ndvi_dates': comprehensive_data.get('ndvi_dates', []),
                 'tmax_series': comprehensive_data.get('tmax_series', []),
                 'tmin_series': comprehensive_data.get('tmin_series', []),
                 'temp_dates': comprehensive_data.get('temp_dates', []),
+                
+                # Soil temperature (NEW)
+                'soil_tmax': comprehensive_data.get('soil_tmax_series', []),
+                'soil_tmin': comprehensive_data.get('soil_tmin_series', []),
+                'soil_temp_mean': comprehensive_data.get('soil_temp_mean', 12),
+                
+                # Soil moisture and texture
                 'soil_moisture': comprehensive_data.get('soil_moisture', 20),
                 'field_capacity': comprehensive_data.get('field_capacity', 25),
+                'soil_type': comprehensive_data.get('soil_type', 'loam'),
+                'sand_percent': comprehensive_data.get('sand_percent', 40),
+                'clay_percent': comprehensive_data.get('clay_percent', 20),
+                'silt_percent': comprehensive_data.get('silt_percent', 40),
+                
+                # Evapotranspiration (NEW)
+                'et_mean': comprehensive_data.get('et_mean', 3.5),
+                'et_total': comprehensive_data.get('et_total', 100),
+                'pet_mean': comprehensive_data.get('pet_mean', 4.5),
+                
+                # Location for ET calculation
+                'latitude': lat,
+                'day_of_year': date.timetuple().tm_yday,
             }
             
             # Convert temperature from Kelvin to Celsius and scale
@@ -484,6 +504,31 @@ class ImprovedBloomPredictor:
         # Field capacity varies by approximate soil type (inferred from location)
         field_capacity = 20 + abs(np.sin(lat * lon)) * 10  # 20-30% range
         
+        # Soil temperature (typically more stable than air temp)
+        # Estimate as 90% of air temperature with smaller range
+        soil_tmax_series = [t * 0.9 for t in tmax_series]
+        soil_tmin_series = [t * 0.9 for t in tmin_series]
+        soil_temp_mean = temp_mean * 0.9
+        
+        # Soil texture (estimated based on geographic location)
+        # Simplified: coastal = sandy, inland = loam, mountains = clay-loam
+        if abs(lat) > 45:  # High latitude
+            soil_type = 'silt_loam'
+            sand_pct, clay_pct, silt_pct = 20, 15, 65
+        elif elevation > 500:  # Mountains
+            soil_type = 'clay_loam'
+            sand_pct, clay_pct, silt_pct = 30, 35, 35
+        else:  # Default
+            soil_type = 'loam'
+            sand_pct, clay_pct, silt_pct = 40, 20, 40
+        
+        # Evapotranspiration estimate (using simplified formula)
+        temp_range = temp_max - temp_min
+        et_estimate = 0.0023 * (temp_mean + 17.8) * np.sqrt(max(temp_range, 0.1)) * 25  # Simplified
+        et_mean = max(2.0, min(6.0, et_estimate))
+        et_total = et_mean * 30
+        pet_mean = et_mean * 1.2  # Potential ET slightly higher
+        
         return {
             'temp_mean': temp_mean,
             'temp_max': temp_max,
@@ -501,8 +546,28 @@ class ImprovedBloomPredictor:
             'tmax_series': tmax_series,
             'tmin_series': tmin_series,
             'temp_dates': [d.strftime('%Y-%m-%d') for d in dates_series],
+            
+            # Soil temperature (NEW)
+            'soil_tmax': soil_tmax_series,
+            'soil_tmin': soil_tmin_series,
+            'soil_temp_mean': soil_temp_mean,
+            
+            # Soil moisture and texture
             'soil_moisture': soil_moisture,
             'field_capacity': field_capacity,
+            'soil_type': soil_type,
+            'sand_percent': sand_pct,
+            'clay_percent': clay_pct,
+            'silt_percent': silt_pct,
+            
+            # Evapotranspiration (NEW)
+            'et_mean': et_mean,
+            'et_total': et_total,
+            'pet_mean': pet_mean,
+            
+            # Location data for ET calculation
+            'latitude': lat,
+            'day_of_year': day_of_year,
         }
     
     def get_environmental_data(self, lat, lon, date):
@@ -559,10 +624,16 @@ class ImprovedBloomPredictor:
             advanced_features = calculate_comprehensive_bloom_features({
                 'ndvi_time_series': env_data.get('ndvi_time_series', []),
                 'dates': pd.to_datetime(env_data.get('ndvi_dates', [])) if env_data.get('ndvi_dates') else [],
-                'tmax': env_data.get('tmax_series', [env_data['temp_max']]),
-                'tmin': env_data.get('tmin_series', [env_data['temp_min']]),
+                'tmax': env_data.get('tmax_series', [env_data.get('temp_max', 20)]),
+                'tmin': env_data.get('tmin_series', [env_data.get('temp_min', 10)]),
+                'soil_tmax': env_data.get('soil_tmax', []),
+                'soil_tmin': env_data.get('soil_tmin', []),
                 'soil_moisture': env_data.get('soil_moisture', 20),
-                'field_capacity': env_data.get('field_capacity', 25)
+                'field_capacity': env_data.get('field_capacity', 25),
+                'soil_type': env_data.get('soil_type', 'loam'),
+                'latitude': row['lat'],
+                'day_of_year': row['day_of_year'],
+                'humidity': 50  # Default, could be enhanced with actual data
             })
             
             # Build comprehensive feature vector
@@ -603,15 +674,36 @@ class ImprovedBloomPredictor:
                 'is_spring_active': int(advanced_features.get('is_spring_active', False)),
                 'winter_ndvi_baseline': advanced_features.get('winter_ndvi_baseline', 0.2),
                 
-                # 2. Growing Degree Days (Baskerville-Emin method)
+                # 2. Smoothed NDVI features (NEW)
+                'ndvi_smoothed_current': advanced_features.get('ndvi_smoothed_current', env_data['ndvi_mean']),
+                'ndvi_smoothed_mean': advanced_features.get('ndvi_smoothed_mean', env_data['ndvi_mean']),
+                'ndvi_smoothed_trend': advanced_features.get('ndvi_smoothed_trend', 0.0),
+                
+                # 3. Air Temperature Growing Degree Days
                 'gdd_current': advanced_features.get('gdd_current', 0),
                 'gdd_accumulated_30d': advanced_features.get('gdd_accumulated_30d', 0),
                 
-                # 3. Soil water availability
+                # 4. Soil Temperature and GDD (NEW)
+                'soil_temp_mean': advanced_features.get('soil_temp_mean', env_data.get('soil_temp_mean', env_data['temp_mean'] * 0.9)),
+                'soil_gdd_current': advanced_features.get('soil_gdd_current', 0),
+                'soil_gdd_accumulated_30d': advanced_features.get('soil_gdd_accumulated_30d', 0),
+                
+                # 5. Soil water availability
                 'soil_water_days': advanced_features.get('soil_water_days', 0),
                 'wilting_point': advanced_features.get('wilting_point', 10),
                 'water_stress': int(advanced_features.get('water_stress', False)),
                 'available_water_ratio': advanced_features.get('available_water_ratio', 0.5),
+                
+                # 6. Soil texture (NEW)
+                'soil_texture_code': advanced_features.get('soil_texture_code', 3),  # 3 = loam
+                'sand_percent': advanced_features.get('sand_percent', env_data.get('sand_percent', 40)),
+                'clay_percent': advanced_features.get('clay_percent', env_data.get('clay_percent', 20)),
+                'silt_percent': advanced_features.get('silt_percent', env_data.get('silt_percent', 40)),
+                
+                # 7. Evapotranspiration (NEW)
+                'et0_hargreaves': advanced_features.get('et0_hargreaves', env_data.get('et_mean', 4.0)),
+                'et0_adjusted': advanced_features.get('et0_adjusted', env_data.get('et_mean', 4.0)),
+                'water_deficit_index': advanced_features.get('water_deficit_index', 0.2),
                 
                 # Species encoding (one-hot would be better, but keeping simple)
                 'species': row['scientificName'],
@@ -625,9 +717,9 @@ class ImprovedBloomPredictor:
         self.feature_data = pd.DataFrame(features_list)
         
         # Define features for model (excluding target and non-numeric)
-        # Updated to include all new advanced features
+        # Updated to include all new advanced features (now 44 features total!)
         self.feature_columns = [
-            # Original features
+            # Original features (21)
             'lat', 'lon', 'day_of_year', 'month', 'week_of_year',
             'day_sin', 'day_cos', 'days_from_species_mean',
             'temp_mean', 'temp_max', 'temp_min', 'temp_range',
@@ -636,24 +728,41 @@ class ImprovedBloomPredictor:
             'elevation', 'growing_degree_days', 'moisture_index',
             'vegetation_health',
             
-            # NEW ADVANCED FEATURES
-            # Spring phenology
+            # NEW ADVANCED FEATURES (23 new features)
+            # 1. Spring phenology (4)
             'spring_start_day', 'days_since_spring_start', 'is_spring_active',
             'winter_ndvi_baseline',
             
-            # Growing Degree Days
+            # 2. Smoothed NDVI (3)
+            'ndvi_smoothed_current', 'ndvi_smoothed_mean', 'ndvi_smoothed_trend',
+            
+            # 3. Air Temperature GDD (2)
             'gdd_current', 'gdd_accumulated_30d',
             
-            # Soil water
+            # 4. Soil Temperature and GDD (3)
+            'soil_temp_mean', 'soil_gdd_current', 'soil_gdd_accumulated_30d',
+            
+            # 5. Soil water (4)
             'soil_water_days', 'wilting_point', 'water_stress',
-            'available_water_ratio'
+            'available_water_ratio',
+            
+            # 6. Soil texture (4)
+            'soil_texture_code', 'sand_percent', 'clay_percent', 'silt_percent',
+            
+            # 7. Evapotranspiration (3)
+            'et0_hargreaves', 'et0_adjusted', 'water_deficit_index'
         ]
         
         print(f"✓ Built {len(self.feature_columns)} features for {len(self.feature_data)} observations")
         print(f"  - Original features: 21")
-        print(f"  - Advanced spring features: 4")
-        print(f"  - GDD features: 2")
-        print(f"  - Soil water features: 4")
+        print(f"  - Spring phenology: 4")
+        print(f"  - Smoothed NDVI: 3")
+        print(f"  - Air temperature GDD: 2")
+        print(f"  - Soil temperature & GDD: 3")
+        print(f"  - Soil water: 4")
+        print(f"  - Soil texture: 4")
+        print(f"  - Evapotranspiration: 3")
+        print(f"  TOTAL: {len(self.feature_columns)} features")
         print(f"  Class distribution: Bloom={sum(self.feature_data['bloom'])}, "
               f"No-bloom={sum(self.feature_data['bloom']==0)}")
     
@@ -753,13 +862,19 @@ class ImprovedBloomPredictor:
             'dates': pd.to_datetime(env_data.get('ndvi_dates', [])) if env_data.get('ndvi_dates') else [],
             'tmax': env_data.get('tmax_series', [env_data['temp_max']]),
             'tmin': env_data.get('tmin_series', [env_data['temp_min']]),
+            'soil_tmax': env_data.get('soil_tmax_series', [env_data['temp_max'] * 0.9]),
+            'soil_tmin': env_data.get('soil_tmin_series', [env_data['temp_min'] * 0.9]),
             'soil_moisture': env_data.get('soil_moisture', 20),
-            'field_capacity': env_data.get('field_capacity', 25)
+            'field_capacity': env_data.get('field_capacity', 25),
+            'soil_type': env_data.get('soil_type', 'loam'),
+            'latitude': lat,
+            'day_of_year': day_of_year,
+            'humidity': 50  # Default
         })
         
-        # Build comprehensive feature vector matching training features
+        # Build comprehensive feature vector matching ALL 44 training features
         features = np.array([[
-            # Original features
+            # Original features (21)
             lat, lon, day_of_year, date.month, date.isocalendar()[1],
             day_sin, day_cos, days_from_mean,
             env_data['temp_mean'], env_data['temp_max'], env_data['temp_min'],
@@ -771,22 +886,43 @@ class ImprovedBloomPredictor:
             env_data['precip_total'] / (env_data['temp_mean'] + 20),
             env_data['ndvi_mean'] * (1 + env_data['ndvi_trend']),
             
-            # NEW ADVANCED FEATURES
-            # Spring phenology
+            # NEW ADVANCED FEATURES (23 features)
+            # 1. Spring phenology (4)
             advanced_features.get('spring_start_day', 80),
             advanced_features.get('days_since_spring_start', 0),
             int(advanced_features.get('is_spring_active', False)),
             advanced_features.get('winter_ndvi_baseline', 0.2),
             
-            # Growing Degree Days
+            # 2. Smoothed NDVI (3)
+            advanced_features.get('ndvi_smoothed_current', env_data['ndvi_mean']),
+            advanced_features.get('ndvi_smoothed_mean', env_data['ndvi_mean']),
+            advanced_features.get('ndvi_smoothed_trend', 0.0),
+            
+            # 3. Air Temperature GDD (2)
             advanced_features.get('gdd_current', 0),
             advanced_features.get('gdd_accumulated_30d', 0),
             
-            # Soil water
+            # 4. Soil Temperature and GDD (3)
+            advanced_features.get('soil_temp_mean', env_data.get('soil_temp_mean', env_data['temp_mean'] * 0.9)),
+            advanced_features.get('soil_gdd_current', 0),
+            advanced_features.get('soil_gdd_accumulated_30d', 0),
+            
+            # 5. Soil water (4)
             advanced_features.get('soil_water_days', 0),
             advanced_features.get('wilting_point', 10),
             int(advanced_features.get('water_stress', False)),
-            advanced_features.get('available_water_ratio', 0.5)
+            advanced_features.get('available_water_ratio', 0.5),
+            
+            # 6. Soil texture (4)
+            advanced_features.get('soil_texture_code', 3),  # 3 = loam
+            advanced_features.get('sand_percent', env_data.get('sand_percent', 40)),
+            advanced_features.get('clay_percent', env_data.get('clay_percent', 20)),
+            advanced_features.get('silt_percent', env_data.get('silt_percent', 40)),
+            
+            # 7. Evapotranspiration (3)
+            advanced_features.get('et0_hargreaves', env_data.get('et_mean', 4.0)),
+            advanced_features.get('et0_adjusted', env_data.get('et_mean', 4.0)),
+            advanced_features.get('water_deficit_index', 0.2)
         ]])
         
         # Scale features

@@ -300,8 +300,17 @@ def get_temperature_time_series(lat, lon, start_date, end_date, scale=1000):
             )
             
             # Convert from Kelvin to Celsius (MODIS LST is scaled by 0.02)
-            tmax = ee.Number(temps.get('LST_Day_1km')).multiply(0.02).subtract(273.15)
-            tmin = ee.Number(temps.get('LST_Night_1km')).multiply(0.02).subtract(273.15)
+            # Handle null values with default temperatures
+            tmax = ee.Algorithms.If(
+                temps.get('LST_Day_1km'),
+                ee.Number(temps.get('LST_Day_1km')).multiply(0.02).subtract(273.15),
+                20  # Default 20°C if no data
+            )
+            tmin = ee.Algorithms.If(
+                temps.get('LST_Night_1km'),
+                ee.Number(temps.get('LST_Night_1km')).multiply(0.02).subtract(273.15),
+                10  # Default 10°C if no data
+            )
             
             return ee.Feature(None, {
                 'date': image.date().format('YYYY-MM-dd'),
@@ -364,7 +373,8 @@ def get_soil_moisture_data(lat, lon, date, days_before=30, scale=10000):
         end_date = ee.Date(date)
         start_date = end_date.advance(-days_before, 'day')
         
-        # NASA SMAP Soil Moisture
+        # NASA SMAP Soil Moisture - Surface soil moisture (0-5cm)
+        # Using SPL4SMGP which is a global soil moisture product
         smap = ee.ImageCollection('NASA/SMAP/SPL4SMGP/007') \
             .filterDate(start_date, end_date) \
             .select('sm_surface')
@@ -405,14 +415,324 @@ def get_soil_moisture_data(lat, lon, date, days_before=30, scale=10000):
         }
 
 
+def get_soil_temperature_data(lat, lon, start_date, end_date, scale=10000):
+    """
+    Get soil temperature time series for soil temperature GDD calculation.
+    
+    Uses MODIS Land Surface Temperature as a proxy for soil temperature.
+    LST correlates well with soil temperature at shallow depths (0-10cm).
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    start_date : str or datetime
+        Start date in 'YYYY-MM-DD' format
+    end_date : str or datetime
+        End date in 'YYYY-MM-DD' format
+    scale : int
+        Scale in meters (default 10000m)
+    
+    Returns:
+    --------
+    dict : {
+        'dates': list of date strings,
+        'soil_tmax': list of max soil temps in Celsius,
+        'soil_tmin': list of min soil temps in Celsius,
+        'soil_temp_mean': float (average over period),
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # MODIS Land Surface Temperature (used as proxy for soil temperature)
+        # LST Day ~ max soil temp, LST Night ~ min soil temp
+        lst_collection = ee.ImageCollection('MODIS/061/MOD11A1') \
+            .filterDate(start_date, end_date) \
+            .select(['LST_Day_1km', 'LST_Night_1km'])
+        
+        def extract_soil_temps(image):
+            temps = image.reduceRegion(
+                reducer=ee.Reducer.first(),
+                geometry=point,
+                scale=scale
+            )
+            
+            # Convert from Kelvin to Celsius (MODIS LST is scaled by 0.02)
+            # Apply damping factor: soil temp changes are ~70% of air temp changes
+            # Handle null values
+            soil_tmax = ee.Algorithms.If(
+                temps.get('LST_Day_1km'),
+                ee.Number(temps.get('LST_Day_1km')).multiply(0.02).subtract(273.15).multiply(0.7),
+                15  # Default 15°C if no data
+            )
+            soil_tmin = ee.Algorithms.If(
+                temps.get('LST_Night_1km'),
+                ee.Number(temps.get('LST_Night_1km')).multiply(0.02).subtract(273.15).multiply(0.7),
+                8  # Default 8°C if no data
+            )
+            
+            return ee.Feature(None, {
+                'date': image.date().format('YYYY-MM-dd'),
+                'soil_tmax': soil_tmax,
+                'soil_tmin': soil_tmin
+            })
+        
+        time_series = lst_collection.map(extract_soil_temps)
+        features = time_series.getInfo()['features']
+        
+        dates = [f['properties']['date'] for f in features]
+        soil_tmax = [f['properties']['soil_tmax'] if f['properties']['soil_tmax'] is not None else 15 
+                     for f in features]
+        soil_tmin = [f['properties']['soil_tmin'] if f['properties']['soil_tmin'] is not None else 8 
+                     for f in features]
+        
+        # Calculate mean
+        soil_temp_mean = sum([(tmax + tmin) / 2 for tmax, tmin in zip(soil_tmax, soil_tmin)]) / len(soil_tmax) if len(soil_tmax) > 0 else 12
+        
+        return {
+            'dates': dates,
+            'soil_tmax': soil_tmax,
+            'soil_tmin': soil_tmin,
+            'soil_temp_mean': soil_temp_mean,
+            'success': True
+        }
+    except Exception as e:
+        print(f"Error getting soil temperature data: {e}")
+        return {
+            'dates': [],
+            'soil_tmax': [],
+            'soil_tmin': [],
+            'soil_temp_mean': 12,
+            'success': False
+        }
+
+
+def get_evapotranspiration_data(lat, lon, start_date, end_date, scale=500):
+    """
+    Get evapotranspiration data from MODIS MOD16A2 (8-day composite).
+    
+    ET measures water loss from soil and plant surfaces, critical for
+    understanding water stress conditions that affect blooming.
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    start_date : str or datetime
+        Start date in 'YYYY-MM-DD' format
+    end_date : str or datetime
+        End date in 'YYYY-MM-DD' format
+    scale : int
+        Scale in meters (default 500m for MOD16A2)
+    
+    Returns:
+    --------
+    dict : {
+        'et_mean': float (mean ET in mm/day),
+        'et_total': float (total ET over period in mm),
+        'pet_mean': float (mean potential ET in mm/day),
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # MODIS Evapotranspiration MOD16A2 (8-day composite)
+        et_collection = ee.ImageCollection('MODIS/061/MOD16A2GF') \
+            .filterDate(start_date, end_date) \
+            .select(['ET', 'PET'])  # Actual ET and Potential ET
+        
+        # Calculate mean ET over the period
+        et_mean_image = et_collection.mean()
+        et_total_image = et_collection.sum()
+        
+        result_mean = et_mean_image.reduceRegion(
+            reducer=ee.Reducer.first(),
+            geometry=point,
+            scale=scale
+        )
+        
+        result_total = et_total_image.reduceRegion(
+            reducer=ee.Reducer.first(),
+            geometry=point,
+            scale=scale
+        )
+        
+        # ET values are in 0.1 mm/8-day, convert to mm/day
+        et_mean_val = result_mean.get('ET')
+        pet_mean_val = result_mean.get('PET')
+        et_total_val = result_total.get('ET')
+        
+        if et_mean_val is not None:
+            # Scale from 0.1 mm/8-day to mm/day
+            et_mean = float(ee.Number(et_mean_val).multiply(0.1).divide(8).getInfo())
+            pet_mean = float(ee.Number(pet_mean_val).multiply(0.1).divide(8).getInfo())
+            et_total = float(ee.Number(et_total_val).multiply(0.1).getInfo())
+        else:
+            et_mean = 3.5  # Default
+            pet_mean = 4.5
+            et_total = 100
+        
+        return {
+            'et_mean': et_mean,
+            'et_total': et_total,
+            'pet_mean': pet_mean,
+            'success': et_mean_val is not None
+        }
+    except Exception as e:
+        print(f"Error getting evapotranspiration data: {e}")
+        return {
+            'et_mean': 3.5,
+            'et_total': 100,
+            'pet_mean': 4.5,
+            'success': False
+        }
+
+
+def get_soil_texture_from_soilgrids(lat, lon, scale=250):
+    """
+    Get soil texture classification from SoilGrids dataset.
+    
+    SoilGrids provides global soil property maps including sand, silt, and clay content.
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    scale : int
+        Scale in meters (default 250m)
+    
+    Returns:
+    --------
+    dict : {
+        'sand_percent': float,
+        'clay_percent': float,
+        'silt_percent': float,
+        'soil_type': str (texture classification),
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # OpenLandMap SoilGrids - soil texture fractions at 0-5cm depth
+        # Using sand and clay content (g/kg, need to convert to %)
+        soil_sand = ee.Image("OpenLandMap/SOL/SOL_SAND-WFRACTION_USDA-3A1A1A_M/v02") \
+            .select('b0')  # 0-5cm depth
+        soil_clay = ee.Image("OpenLandMap/SOL/SOL_CLAY-WFRACTION_USDA-3A1A1A_M/v02") \
+            .select('b0')
+        # Calculate silt as remainder (100 - sand - clay)
+        soil_silt = None  # Will calculate from sand and clay
+        
+        # Combine into single image
+        soil_texture = soil_sand.addBands([soil_clay]) \
+            .rename(['sand', 'clay'])
+        
+        result = soil_texture.reduceRegion(
+            reducer=ee.Reducer.first(),
+            geometry=point,
+            scale=scale
+        )
+        
+        sand = result.get('sand')
+        clay = result.get('clay')
+        
+        if sand is not None and clay is not None:
+            # Convert from g/kg to percentage
+            sand_pct = float(ee.Number(sand).divide(10).getInfo())
+            clay_pct = float(ee.Number(clay).divide(10).getInfo())
+            # Calculate silt as remainder
+            silt_pct = max(0, 100 - sand_pct - clay_pct)
+            
+            # Classify soil texture based on USDA texture triangle
+            soil_type = classify_soil_texture(sand_pct, clay_pct, silt_pct)
+        else:
+            sand_pct = 40  # Default: loam
+            clay_pct = 20
+            silt_pct = 40
+            soil_type = 'loam'
+        
+        return {
+            'sand_percent': sand_pct,
+            'clay_percent': clay_pct,
+            'silt_percent': silt_pct,
+            'soil_type': soil_type,
+            'success': sand is not None
+        }
+    except Exception as e:
+        print(f"Error getting soil texture: {e}")
+        return {
+            'sand_percent': 40,
+            'clay_percent': 20,
+            'silt_percent': 40,
+            'soil_type': 'loam',
+            'success': False
+        }
+
+
+def classify_soil_texture(sand, clay, silt):
+    """
+    Classify soil texture based on USDA texture triangle.
+    
+    Parameters:
+    -----------
+    sand : float
+        Sand percentage (0-100)
+    clay : float
+        Clay percentage (0-100)
+    silt : float
+        Silt percentage (0-100)
+    
+    Returns:
+    --------
+    str : Soil texture classification
+    """
+    # Simplified USDA texture triangle classification
+    if sand >= 85:
+        return 'sand'
+    elif sand >= 70 and clay < 15:
+        return 'loamy_sand'
+    elif (sand >= 50 and clay >= 7 and clay < 20) or (sand >= 43 and clay < 7):
+        return 'sandy_loam'
+    elif clay >= 40:
+        if sand >= 45:
+            return 'sandy_clay'
+        elif silt >= 40:
+            return 'silty_clay'
+        else:
+            return 'clay'
+    elif clay >= 27:
+        if sand >= 20 and sand < 45:
+            return 'clay_loam'
+        else:
+            return 'silty_clay_loam'
+    elif silt >= 50 and clay >= 12 and clay < 27:
+        return 'silt_loam'
+    elif silt >= 80 and clay < 12:
+        return 'silt'
+    else:
+        return 'loam'
+
+
 def get_comprehensive_environmental_data(lat, lon, date, lookback_days=90):
     """
     Get comprehensive environmental data for advanced bloom feature calculation.
     
     This function retrieves:
-    - NDVI time series (for spring detection)
+    - NDVI time series (for spring detection and smoothed NDVI)
     - Temperature time series (for GDD calculation)
+    - Soil temperature time series (for soil GDD)
     - Soil moisture data (for water availability)
+    - Soil texture (sand, clay, silt percentages)
+    - Evapotranspiration (for water stress analysis)
     - Current environmental conditions
     
     Parameters:
@@ -428,7 +748,7 @@ def get_comprehensive_environmental_data(lat, lon, date, lookback_days=90):
     
     Returns:
     --------
-    dict : Comprehensive environmental data including time series
+    dict : Comprehensive environmental data including time series and all variables
     """
     if isinstance(date, str):
         target_date = datetime.strptime(date, '%Y-%m-%d')
@@ -446,19 +766,58 @@ def get_comprehensive_environmental_data(lat, lon, date, lookback_days=90):
                                           start_date.strftime('%Y-%m-%d'),
                                           target_date.strftime('%Y-%m-%d'))
     
+    soil_temp_ts = get_soil_temperature_data(lat, lon,
+                                             start_date.strftime('%Y-%m-%d'),
+                                             target_date.strftime('%Y-%m-%d'))
+    
     soil_data = get_soil_moisture_data(lat, lon, target_date.strftime('%Y-%m-%d'))
+    
+    # Get soil texture (static data)
+    soil_texture = get_soil_texture_from_soilgrids(lat, lon)
+    
+    # Get evapotranspiration data (for last 30 days)
+    et_start = target_date - timedelta(days=30)
+    et_data = get_evapotranspiration_data(lat, lon,
+                                          et_start.strftime('%Y-%m-%d'),
+                                          target_date.strftime('%Y-%m-%d'))
     
     # Combine all data
     result = {
+        # NDVI data
         'ndvi_time_series': ndvi_ts['ndvi'] if ndvi_ts['success'] else [],
         'ndvi_dates': ndvi_ts['dates'] if ndvi_ts['success'] else [],
+        
+        # Air temperature data
         'tmax_series': temp_ts['tmax'] if temp_ts['success'] else [],
         'tmin_series': temp_ts['tmin'] if temp_ts['success'] else [],
         'temp_dates': temp_ts['dates'] if temp_ts['success'] else [],
+        
+        # Soil temperature data (NEW)
+        'soil_tmax_series': soil_temp_ts['soil_tmax'] if soil_temp_ts['success'] else [],
+        'soil_tmin_series': soil_temp_ts['soil_tmin'] if soil_temp_ts['success'] else [],
+        'soil_temp_mean': soil_temp_ts['soil_temp_mean'],
+        
+        # Soil moisture and water availability
         'soil_moisture': soil_data['soil_moisture'],
         'field_capacity': soil_data['field_capacity'],
+        
+        # Soil texture (NEW)
+        'sand_percent': soil_texture['sand_percent'],
+        'clay_percent': soil_texture['clay_percent'],
+        'silt_percent': soil_texture['silt_percent'],
+        'soil_type': soil_texture['soil_type'],
+        
+        # Evapotranspiration (NEW)
+        'et_mean': et_data['et_mean'],
+        'et_total': et_data['et_total'],
+        'pet_mean': et_data['pet_mean'],
+        
+        # Metadata flags
         'has_time_series': ndvi_ts['success'] and temp_ts['success'],
-        'has_soil_data': soil_data['success']
+        'has_soil_data': soil_data['success'],
+        'has_soil_temp': soil_temp_ts['success'],
+        'has_soil_texture': soil_texture['success'],
+        'has_et_data': et_data['success']
     }
     
     return result

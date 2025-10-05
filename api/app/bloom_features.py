@@ -50,7 +50,7 @@ def calculate_spring_start_date(ndvi_time_series, dates):
     # Step 1: Calculate 5-day moving average to smooth the data
     # This removes daily inconsistencies and shows the real growth trend
     window_size = 5
-    ndvi_smoothed = pd.Series(ndvi).rolling(window=window_size, center=True).mean().fillna(method='bfill').fillna(method='ffill').values
+    ndvi_smoothed = pd.Series(ndvi).rolling(window=window_size, center=True).mean().bfill().ffill().values
     
     # Step 2: Calculate winter NDVI baseline (Dec 1 - March 1)
     # Extract day of year for each date
@@ -307,6 +307,228 @@ def estimate_field_capacity_from_soil_type(soil_type='loam'):
     return soil_fc.get(soil_type.lower(), 25)  # Default to loam
 
 
+def get_soil_texture_encoding(soil_type='loam'):
+    """
+    Get numeric encoding for soil texture classification.
+    
+    Soil texture affects water retention, nutrient availability, and root penetration.
+    Encoding follows typical soil classification from coarse to fine texture.
+    
+    Parameters:
+    -----------
+    soil_type : str
+        Soil texture classification
+    
+    Returns:
+    --------
+    dict : {
+        'soil_texture_code': int (0-8),
+        'sand_percent': float,
+        'clay_percent': float,
+        'silt_percent': float
+    }
+    """
+    soil_properties = {
+        'sand': {'code': 0, 'sand': 90, 'clay': 5, 'silt': 5},
+        'loamy_sand': {'code': 1, 'sand': 80, 'clay': 10, 'silt': 10},
+        'sandy_loam': {'code': 2, 'sand': 65, 'clay': 10, 'silt': 25},
+        'loam': {'code': 3, 'sand': 40, 'clay': 20, 'silt': 40},
+        'silt_loam': {'code': 4, 'sand': 20, 'clay': 15, 'silt': 65},
+        'sandy_clay': {'code': 5, 'sand': 50, 'clay': 35, 'silt': 15},
+        'clay_loam': {'code': 6, 'sand': 30, 'clay': 35, 'silt': 35},
+        'silty_clay': {'code': 7, 'sand': 10, 'clay': 45, 'silt': 45},
+        'clay': {'code': 8, 'sand': 20, 'clay': 60, 'silt': 20}
+    }
+    
+    props = soil_properties.get(soil_type.lower(), soil_properties['loam'])
+    
+    return {
+        'soil_texture_code': props['code'],
+        'sand_percent': props['sand'],
+        'clay_percent': props['clay'],
+        'silt_percent': props['silt']
+    }
+
+
+def calculate_smoothed_ndvi(ndvi_time_series, window_size=5):
+    """
+    Calculate smoothed NDVI using moving average.
+    
+    Smoothing removes daily inconsistencies and noise from satellite data,
+    revealing the true vegetation growth trend.
+    
+    Parameters:
+    -----------
+    ndvi_time_series : array-like
+        Daily NDVI values
+    window_size : int, default=5
+        Size of the moving average window (days)
+    
+    Returns:
+    --------
+    dict : {
+        'ndvi_smoothed_current': float (current smoothed value),
+        'ndvi_smoothed_mean': float (mean of smoothed series),
+        'ndvi_smoothed_trend': float (trend/slope of smoothed series)
+    }
+    """
+    if len(ndvi_time_series) < window_size:
+        # Not enough data for smoothing
+        current_val = ndvi_time_series[-1] if len(ndvi_time_series) > 0 else 0.3
+        return {
+            'ndvi_smoothed_current': current_val,
+            'ndvi_smoothed_mean': current_val,
+            'ndvi_smoothed_trend': 0.0
+        }
+    
+    # Apply moving average
+    ndvi_smoothed = pd.Series(ndvi_time_series).rolling(
+        window=window_size, center=True
+    ).mean().bfill().ffill().values
+    
+    # Calculate trend (slope)
+    x = np.arange(len(ndvi_smoothed))
+    if len(x) > 1:
+        trend = np.polyfit(x, ndvi_smoothed, 1)[0]
+    else:
+        trend = 0.0
+    
+    return {
+        'ndvi_smoothed_current': float(ndvi_smoothed[-1]),
+        'ndvi_smoothed_mean': float(np.mean(ndvi_smoothed)),
+        'ndvi_smoothed_trend': float(trend)
+    }
+
+
+def calculate_soil_temperature_gdd(soil_temp_max_series, soil_temp_min_series, tbase=10):
+    """
+    Calculate Growing Degree Days using soil temperature (Baskerville-Emin method).
+    
+    Soil temperature GDD is often more accurate than air temperature GDD for root
+    development and some bloom triggers, as soil temperature is more stable and
+    directly affects root activity.
+    
+    Formula: Soil GDD = [(Tsoil_max + Tsoil_min) / 2] - Tbase
+    
+    Parameters:
+    -----------
+    soil_temp_max_series : array-like
+        Daily maximum soil temperature (°C)
+    soil_temp_min_series : array-like
+        Daily minimum soil temperature (°C)
+    tbase : float, default=10
+        Base temperature threshold (10°C is common for many plants)
+    
+    Returns:
+    --------
+    dict : {
+        'soil_gdd_current': float (current day GDD),
+        'soil_gdd_accumulated_30d': float (30-day accumulation)
+    }
+    """
+    if len(soil_temp_max_series) == 0 or len(soil_temp_min_series) == 0:
+        return {
+            'soil_gdd_current': 0.0,
+            'soil_gdd_accumulated_30d': 0.0
+        }
+    
+    # Convert to numpy arrays
+    tmax = np.array(soil_temp_max_series)
+    tmin = np.array(soil_temp_min_series)
+    
+    # Calculate average soil temperature
+    tavg = (tmax + tmin) / 2
+    
+    # Calculate GDD (only positive values)
+    gdd = np.maximum(0, tavg - tbase)
+    
+    # Current day GDD
+    current_gdd = float(gdd[-1]) if len(gdd) > 0 else 0.0
+    
+    # Accumulated GDD over last 30 days (or available days)
+    days_to_accumulate = min(30, len(gdd))
+    accumulated_gdd = float(np.sum(gdd[-days_to_accumulate:]))
+    
+    return {
+        'soil_gdd_current': current_gdd,
+        'soil_gdd_accumulated_30d': accumulated_gdd
+    }
+
+
+def calculate_reference_evapotranspiration(temp_mean, temp_max, temp_min, 
+                                          latitude, day_of_year, 
+                                          wind_speed=2.0, humidity=50):
+    """
+    Calculate reference evapotranspiration (ET0) using simplified Hargreaves equation.
+    
+    ET measures water loss from soil and plant surfaces. High ET can stress plants
+    and reduce bloom probability if soil moisture is insufficient.
+    
+    Simplified Hargreaves formula:
+    ET0 = 0.0023 × (Tmean + 17.8) × (Tmax - Tmin)^0.5 × Ra
+    
+    Where Ra is extraterrestrial radiation (calculated from latitude and day of year)
+    
+    Parameters:
+    -----------
+    temp_mean : float
+        Mean daily temperature (°C)
+    temp_max : float
+        Maximum daily temperature (°C)
+    temp_min : float
+        Minimum daily temperature (°C)
+    latitude : float
+        Latitude in degrees
+    day_of_year : int
+        Day of year (1-365)
+    wind_speed : float, optional
+        Wind speed in m/s (default 2.0)
+    humidity : float, optional
+        Relative humidity percentage (default 50)
+    
+    Returns:
+    --------
+    dict : {
+        'et0_hargreaves': float (mm/day),
+        'et0_adjusted': float (mm/day, adjusted for humidity),
+        'water_deficit_index': float (ET0 / available water ratio)
+    }
+    """
+    # Calculate extraterrestrial radiation (Ra) - simplified
+    # Solar declination
+    delta = 0.409 * np.sin(2 * np.pi * day_of_year / 365 - 1.39)
+    
+    # Convert latitude to radians
+    lat_rad = latitude * np.pi / 180
+    
+    # Sunset hour angle
+    omega_s = np.arccos(-np.tan(lat_rad) * np.tan(delta))
+    
+    # Relative distance Earth-Sun
+    dr = 1 + 0.033 * np.cos(2 * np.pi * day_of_year / 365)
+    
+    # Extraterrestrial radiation (MJ/m²/day)
+    Ra = (24 * 60 / np.pi) * 0.082 * dr * (
+        omega_s * np.sin(lat_rad) * np.sin(delta) +
+        np.cos(lat_rad) * np.cos(delta) * np.sin(omega_s)
+    )
+    
+    # Hargreaves ET0 (mm/day)
+    temp_range = max(temp_max - temp_min, 0.1)  # Avoid zero
+    et0_hargreaves = 0.0023 * (temp_mean + 17.8) * np.sqrt(temp_range) * Ra
+    
+    # Adjust for humidity (simple correction factor)
+    # Higher humidity = lower ET
+    humidity_factor = 1.0 - ((humidity - 50) / 200)  # Centered at 50%
+    et0_adjusted = et0_hargreaves * humidity_factor
+    
+    return {
+        'et0_hargreaves': float(max(0, et0_hargreaves)),
+        'et0_adjusted': float(max(0, et0_adjusted)),
+        'extraterrestrial_radiation': float(Ra)
+    }
+
+
 def calculate_comprehensive_bloom_features(environmental_data, location_data=None):
     """
     Calculate all advanced bloom features from environmental and location data.
@@ -317,10 +539,16 @@ def calculate_comprehensive_bloom_features(environmental_data, location_data=Non
         Dictionary containing:
         - 'ndvi_time_series': list of NDVI values (optional, for spring detection)
         - 'dates': list of dates corresponding to NDVI (optional)
-        - 'tmax': max temperature or list of max temps
-        - 'tmin': min temperature or list of min temps
+        - 'tmax': max temperature or list of max temps (air)
+        - 'tmin': min temperature or list of min temps (air)
+        - 'soil_tmax': max soil temperature or list (optional)
+        - 'soil_tmin': min soil temperature or list (optional)
         - 'soil_moisture': soil water content (mm or %)
         - 'field_capacity': field capacity % (optional, will estimate if missing)
+        - 'soil_type': soil texture classification (optional)
+        - 'latitude': latitude for ET calculation (optional)
+        - 'day_of_year': day of year for ET calculation (optional)
+        - 'humidity': relative humidity % (optional)
     
     location_data : dict, optional
         Additional location info like soil type for better estimation
@@ -347,26 +575,70 @@ def calculate_comprehensive_bloom_features(environmental_data, location_data=Non
             'winter_ndvi_baseline': 0.2
         })
     
-    # 2. Growing Degree Days
+    # 2. Smoothed NDVI features
+    if 'ndvi_time_series' in environmental_data:
+        smoothed_ndvi_features = calculate_smoothed_ndvi(
+            environmental_data['ndvi_time_series'],
+            window_size=5
+        )
+        features.update(smoothed_ndvi_features)
+    else:
+        # Use raw NDVI if available
+        current_ndvi = environmental_data.get('ndvi_mean', 0.4)
+        features.update({
+            'ndvi_smoothed_current': current_ndvi,
+            'ndvi_smoothed_mean': current_ndvi,
+            'ndvi_smoothed_trend': 0.0
+        })
+    
+    # 3. Air Temperature Growing Degree Days
     tmax = environmental_data.get('tmax', 20)
     tmin = environmental_data.get('tmin', 10)
     
     # If we have time series, calculate accumulated GDD
-    if isinstance(tmax, (list, np.ndarray)) and isinstance(tmin, (list, np.ndarray)):
+    if isinstance(tmax, (list, np.ndarray)) and isinstance(tmin, (list, np.ndarray)) and len(tmax) > 0:
         features['gdd_accumulated_30d'] = calculate_accumulated_gdd(tmax, tmin, tbase=0, days=30)
         # Also calculate current day GDD
         features['gdd_current'] = float(calculate_growing_degree_days(tmax[-1], tmin[-1], tbase=0))
     else:
         # Single value GDD
+        if isinstance(tmax, (list, np.ndarray)) and len(tmax) > 0:
+            tmax = tmax[-1]
+            tmin = tmin[-1] if isinstance(tmin, (list, np.ndarray)) and len(tmin) > 0 else 10
         features['gdd_current'] = float(calculate_growing_degree_days(tmax, tmin, tbase=0))
         features['gdd_accumulated_30d'] = features['gdd_current'] * 30  # Rough estimate
     
-    # 3. Soil water availability
+    # 4. Soil Temperature Growing Degree Days
+    soil_tmax = environmental_data.get('soil_tmax', [])
+    soil_tmin = environmental_data.get('soil_tmin', [])
+    
+    if len(soil_tmax) > 0 and len(soil_tmin) > 0:
+        soil_gdd_features = calculate_soil_temperature_gdd(soil_tmax, soil_tmin, tbase=10)
+        features.update(soil_gdd_features)
+    else:
+        # Estimate from air temperature (soil temp is typically more stable)
+        # Rule of thumb: soil temp lags air temp and has smaller range
+        if isinstance(tmax, (list, np.ndarray)):
+            soil_temp_avg = (np.mean(tmax) + np.mean(tmin)) / 2 * 0.9  # Slightly cooler
+        else:
+            soil_temp_avg = (tmax + tmin) / 2 * 0.9
+        features['soil_gdd_current'] = max(0, soil_temp_avg - 10)
+        features['soil_gdd_accumulated_30d'] = features['soil_gdd_current'] * 30
+    
+    # Average soil temperature for reference
+    if isinstance(tmax, (list, np.ndarray)) and len(tmax) > 0:
+        features['soil_temp_mean'] = (np.mean(tmax) + np.mean(tmin)) / 2 * 0.9
+    else:
+        features['soil_temp_mean'] = (tmax + tmin) / 2 * 0.9
+    
+    # 5. Soil water availability
     soil_moisture = environmental_data.get('soil_moisture', 20)
     
     # Determine field capacity
     if 'field_capacity' in environmental_data:
         field_capacity = environmental_data['field_capacity']
+    elif 'soil_type' in environmental_data:
+        field_capacity = estimate_field_capacity_from_soil_type(environmental_data['soil_type'])
     elif location_data and 'soil_type' in location_data:
         field_capacity = estimate_field_capacity_from_soil_type(location_data['soil_type'])
     else:
@@ -374,6 +646,48 @@ def calculate_comprehensive_bloom_features(environmental_data, location_data=Non
     
     soil_water_features = calculate_soil_water_days(soil_moisture, field_capacity)
     features.update(soil_water_features)
+    
+    # 6. Soil texture encoding
+    soil_type = environmental_data.get('soil_type', 
+                                       location_data.get('soil_type', 'loam') if location_data else 'loam')
+    soil_texture_features = get_soil_texture_encoding(soil_type)
+    features.update(soil_texture_features)
+    
+    # 7. Evapotranspiration
+    if 'latitude' in environmental_data and 'day_of_year' in environmental_data:
+        # Get temperature values for ET calculation
+        if isinstance(tmax, (list, np.ndarray)) and len(tmax) > 0:
+            temp_max_val = tmax[-1]
+            temp_min_val = tmin[-1] if len(tmin) > 0 else 10
+            temp_mean_val = (temp_max_val + temp_min_val) / 2
+        else:
+            temp_max_val = tmax if not isinstance(tmax, (list, np.ndarray)) else 20
+            temp_min_val = tmin if not isinstance(tmin, (list, np.ndarray)) else 10
+            temp_mean_val = (temp_max_val + temp_min_val) / 2
+        
+        et_features = calculate_reference_evapotranspiration(
+            temp_mean_val,
+            temp_max_val,
+            temp_min_val,
+            environmental_data['latitude'],
+            environmental_data['day_of_year'],
+            humidity=environmental_data.get('humidity', 50)
+        )
+        features.update(et_features)
+        
+        # Calculate water deficit index (ET relative to available water)
+        if features['soil_water_days'] > 0:
+            features['water_deficit_index'] = et_features['et0_adjusted'] / features['soil_water_days']
+        else:
+            features['water_deficit_index'] = 10.0  # High water stress
+    else:
+        # Use defaults
+        features.update({
+            'et0_hargreaves': 4.0,  # Typical ET for temperate climate
+            'et0_adjusted': 4.0,
+            'extraterrestrial_radiation': 25.0,
+            'water_deficit_index': 0.2
+        })
     
     return features
 
