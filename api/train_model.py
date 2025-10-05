@@ -148,34 +148,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Train with default parameters
   python train_model.py
-  
-  # Train with custom parameters
-  python train_model.py --n_estimators 300 --max_depth 7 --learning_rate 0.03
-  
-  # Train with Earth Engine (requires credentials)
+  python train_model.py --n_estimators 300 --max_depth 7
   python train_model.py --use_earth_engine
-  
-  # Custom data path and output
-  python train_model.py --data backend/my_data.csv --output models/my_model.pkl
+  python train_model.py --data custom_data.csv --output custom_model.pkl
         """
     )
     
-    parser.add_argument('--data', type=str, default='backend/data.csv',
-                       help='Path to historical bloom data CSV (default: backend/data.csv)')
-    parser.add_argument('--output', type=str, default='app/bloom_model_v2.pkl',
-                       help='Where to save trained model (default: app/bloom_model_v2.pkl)')
-    parser.add_argument('--use_earth_engine', action='store_true',
-                       help='Use Google Earth Engine for environmental data')
-    parser.add_argument('--n_estimators', type=int, default=200,
-                       help='Number of boosting stages (default: 200)')
-    parser.add_argument('--max_depth', type=int, default=5,
-                       help='Maximum depth of trees (default: 5)')
-    parser.add_argument('--learning_rate', type=float, default=0.05,
-                       help='Learning rate (default: 0.05)')
-    
-    args = parser.parse_args()
+    parser.add_argument(
+        '--data',
+        type=str,
+        default='../backend/data.csv',
+        help='Path to bloom observation CSV file (default: ../backend/data.csv)'
+    )
     
     try:
         predictor = train_and_save_model(
