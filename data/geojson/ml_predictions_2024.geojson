@@ -1,0 +1,812 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "source": "bloombly_ml_model",
+    "description": "ML model predictions for 2024 cherry blossom bloom dates",
+    "model_version": "sakura_v1",
+    "generated_on": "2025-10-05 09:59:23",
+    "locations": 17,
+    "year": 2024
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "ml_tokyo",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Tokyo",
+        "city": "Tokyo",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                139.60029999999998,
+                35.626200000000004
+              ],
+              [
+                139.7003,
+                35.626200000000004
+              ],
+              [
+                139.7003,
+                35.7262
+              ],
+              [
+                139.60029999999998,
+                35.7262
+              ],
+              [
+                139.60029999999998,
+                35.626200000000004
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_kyoto",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Kyoto",
+        "city": "Kyoto",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                135.7181,
+                34.961600000000004
+              ],
+              [
+                135.81810000000002,
+                34.961600000000004
+              ],
+              [
+                135.81810000000002,
+                35.0616
+              ],
+              [
+                135.7181,
+                35.0616
+              ],
+              [
+                135.7181,
+                34.961600000000004
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_osaka",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Osaka",
+        "city": "Osaka",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-19",
+        "bloom_day_of_year": 79,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-19"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                135.45229999999998,
+                34.6437
+              ],
+              [
+                135.5523,
+                34.6437
+              ],
+              [
+                135.5523,
+                34.7437
+              ],
+              [
+                135.45229999999998,
+                34.7437
+              ],
+              [
+                135.45229999999998,
+                34.6437
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_hiroshima",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Hiroshima",
+        "city": "Hiroshima",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-17",
+        "bloom_day_of_year": 77,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-17"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                132.40529999999998,
+                34.335300000000004
+              ],
+              [
+                132.5053,
+                34.335300000000004
+              ],
+              [
+                132.5053,
+                34.4353
+              ],
+              [
+                132.40529999999998,
+                34.4353
+              ],
+              [
+                132.40529999999998,
+                34.335300000000004
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_fukuoka",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Fukuoka",
+        "city": "Fukuoka",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-15",
+        "bloom_day_of_year": 75,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-15"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                130.3517,
+                33.540400000000005
+              ],
+              [
+                130.45170000000002,
+                33.540400000000005
+              ],
+              [
+                130.45170000000002,
+                33.6404
+              ],
+              [
+                130.3517,
+                33.6404
+              ],
+              [
+                130.3517,
+                33.540400000000005
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_sendai",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Sendai",
+        "city": "Sendai",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                140.8194,
+                38.2182
+              ],
+              [
+                140.91940000000002,
+                38.2182
+              ],
+              [
+                140.91940000000002,
+                38.3182
+              ],
+              [
+                140.8194,
+                38.3182
+              ],
+              [
+                140.8194,
+                38.2182
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_nagoya",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Nagoya",
+        "city": "Nagoya",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                136.8566,
+                35.1315
+              ],
+              [
+                136.9566,
+                35.1315
+              ],
+              [
+                136.9566,
+                35.2315
+              ],
+              [
+                136.8566,
+                35.2315
+              ],
+              [
+                136.8566,
+                35.1315
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_sapporo",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Sapporo",
+        "city": "Sapporo",
+        "country": "Japan",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-04-26",
+        "bloom_day_of_year": 117,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-04-26"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                141.2969,
+                43.0142
+              ],
+              [
+                141.39690000000002,
+                43.0142
+              ],
+              [
+                141.39690000000002,
+                43.1142
+              ],
+              [
+                141.2969,
+                43.1142
+              ],
+              [
+                141.2969,
+                43.0142
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_washington_dc",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Washington DC",
+        "city": "Washington DC",
+        "country": "USA",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-04-19",
+        "bloom_day_of_year": 110,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-04-19"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -77.0869,
+                38.857200000000006
+              ],
+              [
+                -76.9869,
+                38.857200000000006
+              ],
+              [
+                -76.9869,
+                38.9572
+              ],
+              [
+                -77.0869,
+                38.9572
+              ],
+              [
+                -77.0869,
+                38.857200000000006
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_portland",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Portland",
+        "city": "Portland",
+        "country": "USA",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-06-07",
+        "bloom_day_of_year": 159,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-06-07"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -122.7284,
+                45.4652
+              ],
+              [
+                -122.6284,
+                45.4652
+              ],
+              [
+                -122.6284,
+                45.5652
+              ],
+              [
+                -122.7284,
+                45.5652
+              ],
+              [
+                -122.7284,
+                45.4652
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_seattle",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Seattle",
+        "city": "Seattle",
+        "country": "USA",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-06-07",
+        "bloom_day_of_year": 159,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-06-07"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -122.3821,
+                47.556200000000004
+              ],
+              [
+                -122.2821,
+                47.556200000000004
+              ],
+              [
+                -122.2821,
+                47.6562
+              ],
+              [
+                -122.3821,
+                47.6562
+              ],
+              [
+                -122.3821,
+                47.556200000000004
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_san_francisco",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "San Francisco",
+        "city": "San Francisco",
+        "country": "USA",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-04-07",
+        "bloom_day_of_year": 98,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-04-07"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -122.4694,
+                37.724900000000005
+              ],
+              [
+                -122.3694,
+                37.724900000000005
+              ],
+              [
+                -122.3694,
+                37.8249
+              ],
+              [
+                -122.4694,
+                37.8249
+              ],
+              [
+                -122.4694,
+                37.724900000000005
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_new_york",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "New York",
+        "city": "New York",
+        "country": "USA",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-07-25",
+        "bloom_day_of_year": 207,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-07-25"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -74.056,
+                40.662800000000004
+              ],
+              [
+                -73.956,
+                40.662800000000004
+              ],
+              [
+                -73.956,
+                40.7628
+              ],
+              [
+                -74.056,
+                40.7628
+              ],
+              [
+                -74.056,
+                40.662800000000004
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_seoul",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Seoul",
+        "city": "Seoul",
+        "country": "South Korea",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                126.928,
+                37.5165
+              ],
+              [
+                127.02799999999999,
+                37.5165
+              ],
+              [
+                127.02799999999999,
+                37.616499999999995
+              ],
+              [
+                126.928,
+                37.616499999999995
+              ],
+              [
+                126.928,
+                37.5165
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_busan",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Busan",
+        "city": "Busan",
+        "country": "South Korea",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                129.0256,
+                35.1296
+              ],
+              [
+                129.12560000000002,
+                35.1296
+              ],
+              [
+                129.12560000000002,
+                35.2296
+              ],
+              [
+                129.0256,
+                35.2296
+              ],
+              [
+                129.0256,
+                35.1296
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_beijing",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Beijing",
+        "city": "Beijing",
+        "country": "China",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-03-30",
+        "bloom_day_of_year": 90,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-03-30"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                116.3574,
+                39.854200000000006
+              ],
+              [
+                116.45739999999999,
+                39.854200000000006
+              ],
+              [
+                116.45739999999999,
+                39.9542
+              ],
+              [
+                116.3574,
+                39.9542
+              ],
+              [
+                116.3574,
+                39.854200000000006
+              ]
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ml_shanghai",
+      "properties": {
+        "source": "ml_model",
+        "location_name": "Shanghai",
+        "city": "Shanghai",
+        "country": "China",
+        "species": "Prunus serrulata",
+        "predicted_bloom_date": "2024-06-08",
+        "bloom_day_of_year": 160,
+        "model_version": "bloombly_sakura_v1",
+        "forecast_made_on": "2025-10-05",
+        "color": "#FF0066",
+        "opacity": 0.6,
+        "display_label": "ML: 2024-06-08"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                121.4237,
+                31.1804
+              ],
+              [
+                121.52369999999999,
+                31.1804
+              ],
+              [
+                121.52369999999999,
+                31.2804
+              ],
+              [
+                121.4237,
+                31.2804
+              ],
+              [
+                121.4237,
+                31.1804
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

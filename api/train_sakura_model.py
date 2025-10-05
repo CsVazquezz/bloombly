@@ -21,7 +21,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
 class SakuraModelTrainer:
     def __init__(self, data_path='../data/processed/bloom_features_ml.csv'):
-        self.data_path = data_path
+        # Convert to absolute path relative to this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if not os.path.isabs(data_path):
+            self.data_path = os.path.join(script_dir, data_path)
+        else:
+            self.data_path = data_path
+        
         self.data = None
         self.global_model = None
         self.japan_model = None
