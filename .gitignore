@@ -40,6 +40,10 @@ wheels/
 MANIFEST
 *.log
 
+data/csv/
+
+data/jsonl/
+
 # Data files - Keep CSVs for direct processing, ignore large archives
 data-processing/raw/*.zip
 data-processing/raw/*.tar.gz
