@@ -8,6 +8,8 @@ export function initGlobe() {
     .globeImageUrl(CONFIG.EARTH_IMAGE_URL)
     .bumpImageUrl(CONFIG.EARTH_TOPOLOGY_URL)
     .backgroundColor('rgba(15,17,21,1)')
+    .atmosphereColor('rgba(255, 255, 255, 1)')
+    .atmosphereAltitude(0.15)
     .pointOfView(CONFIG.INITIAL_VIEW)
     .hexPolygonsData([])
     .hexPolygonResolution(CONFIG.HEX_POLYGON_RESOLUTION)
@@ -42,7 +44,16 @@ export function getGlobe() {
 
 export function getColorForFeature(feature) {
   if (state.currentColorMode === COLOR_MODE.FAMILY) {
-    return state.familyColors[feature.Family] || CONFIG.DEFAULT_COLOR;
+    // In Family mode, all genera in the same family show the same family color
+    const color = state.familyColors[feature.Family] || CONFIG.DEFAULT_COLOR;
+    return color;
+  } else if (state.currentColorMode === COLOR_MODE.GENUS) {
+    // In Genus mode, each genus gets its unique shade of the family color
+    const color = state.genusColors[feature.Genus] || state.familyColors[feature.Family] || CONFIG.DEFAULT_COLOR;
+    if (!state.genusColors[feature.Genus]) {
+      console.warn(`No color found for genus: ${feature.Genus}, Family: ${feature.Family}`);
+    }
+    return color;
   }
   return CONFIG.DEFAULT_COLOR;
 }
@@ -281,14 +292,14 @@ function applyPlainStyle() {
     const scene = globe.scene();
     const existingLights = scene.children.filter(child => child.isLight);
     
-    // Add rim lighting if not already present
+    // Add rim lighting if not already present - using white for glow effect
     if (!scene.userData.plainModeRimLight) {
-      const rimLight = new THREE.DirectionalLight('#4ED9D9', 0.4);
+      const rimLight = new THREE.DirectionalLight('#FFFFFF', 0.4);
       rimLight.position.set(-2, 1, 3);
       scene.add(rimLight);
       scene.userData.plainModeRimLight = rimLight;
       
-      const rimLight2 = new THREE.DirectionalLight('#4ED9D9', 0.3);
+      const rimLight2 = new THREE.DirectionalLight('#FFFFFF', 0.3);
       rimLight2.position.set(2, -1, -3);
       scene.add(rimLight2);
       scene.userData.plainModeRimLight2 = rimLight2;
