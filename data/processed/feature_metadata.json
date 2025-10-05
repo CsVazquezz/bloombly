@@ -5,12 +5,12 @@
     "pre_2013": "Historical observations before 2013 (no satellite data)",
     "predictions": "is_prediction=True observations (for validation)"
   },
-  "total_features": 77,
+  "total_features": 75,
   "original_features": 25,
-  "engineered_features": 51,
+  "engineered_features": 49,
   "feature_categories": {
     "weather": 35,
-    "soil": 10,
+    "soil": 8,
     "ndvi": 2,
     "elevation": 1,
     "photoperiod": 3
@@ -59,8 +59,6 @@
     "soil_sand_5-15cm": "100.0%",
     "soil_organic_carbon_0-5cm": "100.0%",
     "soil_organic_carbon_5-15cm": "100.0%",
-    "soil_nitrogen_0-5cm": "0.0%",
-    "soil_nitrogen_5-15cm": "0.0%",
     "ndvi_mean_5d": "100.0%",
     "ndvi_mean_10d": "90.0%",
     "elevation_m": "100.0%",

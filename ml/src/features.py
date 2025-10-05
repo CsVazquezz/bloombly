@@ -184,7 +184,6 @@ class BloomFeatureEngineer:
         - Clay content: g/kg
         - Sand content: g/kg  
         - Organic carbon: g/kg
-        - Nitrogen: Not available in OpenLandMap (returns None)
         
         Args:
             latitude: Latitude in degrees
@@ -302,26 +301,6 @@ class BloomFeatureEngineer:
                 soil_features['soil_organic_carbon_0-5cm'] = None
                 soil_features['soil_organic_carbon_5-15cm'] = None
             
-            try:
-                # 5. Nitrogen (0-5cm and 5-15cm depths)
-                nitrogen_img = ee.Image("OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02")
-                nitrogen_values = nitrogen_img.select(['b0', 'b10']).reduceRegion(
-                    reducer=ee.Reducer.first(),
-                    geometry=point,
-                    scale=250,
-                    bestEffort=True
-                ).getInfo()
-                
-                # Note: OpenLandMap doesn't have direct nitrogen, using texture as proxy
-                # This is a limitation - will be None for now
-                soil_features['soil_nitrogen_0-5cm'] = None
-                soil_features['soil_nitrogen_5-15cm'] = None
-                print(f"    ⚠ Nitrogen data not available (using OpenLandMap)")
-            except Exception as e:
-                print(f"    ✗ Nitrogen data failed: {str(e)[:80]}")
-                soil_features['soil_nitrogen_0-5cm'] = None
-                soil_features['soil_nitrogen_5-15cm'] = None
-            
             # Cache the results
             self.soil_cache[cache_key] = soil_features
             return soil_features
@@ -357,8 +336,6 @@ class BloomFeatureEngineer:
             'soil_sand_5-15cm': np.nan,
             'soil_organic_carbon_0-5cm': np.nan,
             'soil_organic_carbon_5-15cm': np.nan,
-            'soil_nitrogen_0-5cm': np.nan,
-            'soil_nitrogen_5-15cm': np.nan,
         }
     
     def get_ndvi_gee(self, latitude: float, longitude: float, bloom_date: datetime) -> Dict[str, float]:
@@ -707,66 +684,76 @@ class BloomFeatureEngineer:
             print("  ⚠ Falling back to GEE for NDVI")
             return self.get_ndvi_gee(latitude, longitude, bloom_date)
     
-    def get_ndvi_with_temporal_fallback(self, latitude: float, longitude: float, bloom_date: datetime, 
-                                        use_appeears: bool = True) -> Dict[str, float]:
+    def get_ndvi_with_temporal_fallback(self, latitude: float, longitude: float, bloom_date: datetime) -> Dict[str, float]:
         """
-        Get NDVI with temporal gap-filling.
-        If no data available for exact date, tries nearby dates within max_temporal_gap.
+        Get NDVI with temporal gap-filling strategy:
+        1. Try GEE for exact date
+        2. Try GEE for nearby dates (±7, ±14, ±30 days)
+        3. If still no data after 10 days gap, try AppEEARS for remaining windows
+        
+        This prioritizes fast GEE queries and only uses slow AppEEARS when necessary.
         
         Args:
             latitude: Latitude in degrees
             longitude: Longitude in degrees
             bloom_date: Original bloom date
-            use_appeears: Whether to use AppEEARS (True) or GEE (False)
             
         Returns:
             Dictionary with NDVI features, filled from nearby dates if needed
         """
-        print(f"  Fetching NDVI with temporal fallback...")
+        print(f"  Fetching NDVI with temporal fallback (GEE first, AppEEARS after 10d)...")
         
-        # Try exact date first
-        if use_appeears:
-            ndvi_features = self.get_ndvi_appeears(latitude, longitude, bloom_date)
-        else:
-            ndvi_features = self.get_ndvi_gee(latitude, longitude, bloom_date)
+        # Try exact date with GEE first
+        ndvi_features = self.get_ndvi_gee(latitude, longitude, bloom_date)
         
         # Check if we got valid data
         has_data = any(v is not None and not np.isnan(v) for v in ndvi_features.values())
         
         if has_data:
+            print(f"    ✓ NDVI found for exact date (GEE)")
             return ndvi_features
         
-        # Try temporal windows if no data found
-        print(f"    ⚠ No NDVI for exact date, trying nearby dates...")
+        # Try temporal windows with GEE
+        print(f"    ⚠ No NDVI for exact date, trying nearby dates with GEE...")
         
         for gap_days in self.temporal_windows[1:]:  # Skip 0 (already tried)
             # Try earlier date
             earlier_date = bloom_date - timedelta(days=gap_days)
-            print(f"    Trying {gap_days} days earlier ({earlier_date.strftime('%Y-%m-%d')})...")
+            print(f"    Trying {gap_days} days earlier ({earlier_date.strftime('%Y-%m-%d')}) with GEE...")
             
-            if use_appeears:
-                temp_features = self.get_ndvi_appeears(latitude, longitude, earlier_date)
-            else:
-                temp_features = self.get_ndvi_gee(latitude, longitude, earlier_date)
+            temp_features = self.get_ndvi_gee(latitude, longitude, earlier_date)
             
             if any(v is not None and not np.isnan(v) for v in temp_features.values()):
-                print(f"    ✓ Found data from {gap_days} days earlier")
+                print(f"    ✓ Found data from {gap_days} days earlier (GEE)")
                 return temp_features
             
             # Try later date
             later_date = bloom_date + timedelta(days=gap_days)
-            print(f"    Trying {gap_days} days later ({later_date.strftime('%Y-%m-%d')})...")
+            print(f"    Trying {gap_days} days later ({later_date.strftime('%Y-%m-%d')}) with GEE...")
             
-            if use_appeears:
-                temp_features = self.get_ndvi_appeears(latitude, longitude, later_date)
-            else:
-                temp_features = self.get_ndvi_gee(latitude, longitude, later_date)
+            temp_features = self.get_ndvi_gee(latitude, longitude, later_date)
             
             if any(v is not None and not np.isnan(v) for v in temp_features.values()):
-                print(f"    ✓ Found data from {gap_days} days later")
+                print(f"    ✓ Found data from {gap_days} days later (GEE)")
                 return temp_features
+            
+            # After 10 days gap, switch to AppEEARS for remaining windows
+            if gap_days > 10:
+                print(f"    ⚠ No GEE data within 10 days, trying AppEEARS for {gap_days}d window...")
+                
+                # Try earlier with AppEEARS
+                temp_features = self.get_ndvi_appeears(latitude, longitude, earlier_date)
+                if any(v is not None and not np.isnan(v) for v in temp_features.values()):
+                    print(f"    ✓ Found data from {gap_days} days earlier (AppEEARS)")
+                    return temp_features
+                
+                # Try later with AppEEARS
+                temp_features = self.get_ndvi_appeears(latitude, longitude, later_date)
+                if any(v is not None and not np.isnan(v) for v in temp_features.values()):
+                    print(f"    ✓ Found data from {gap_days} days later (AppEEARS)")
+                    return temp_features
         
-        print(f"    ✗ No NDVI data found within {self.max_temporal_gap} days")
+        print(f"    ✗ No NDVI data found within {self.max_temporal_gap} days (tried GEE + AppEEARS)")
         return self._get_default_ndvi_features()
     
     def calculate_gdd(self, temps: list, base_temp: float = 5.0) -> float:
@@ -944,13 +931,10 @@ class BloomFeatureEngineer:
         soil_features = self.get_soil_properties(latitude, longitude)
         features.update(soil_features)
         
-        # 3. NDVI vegetation index (GEE with temporal gap-filling - AppEEARS too slow)
+        # 3. NDVI vegetation index (GEE first, AppEEARS fallback after 10 days)
         print(f"   Fetching NDVI vegetation data...")
-        # Use GEE by default (AppEEARS is 40x slower)
-        # Set use_appeears=True to enable AppEEARS (requires 1-3 min per observation)
-        use_appeears = False  # Change to True if you want AppEEARS (much slower but slightly better coverage)
         ndvi_features = self.get_ndvi_with_temporal_fallback(
-            latitude, longitude, bloom_date, use_appeears=use_appeears
+            latitude, longitude, bloom_date
         )
         features.update(ndvi_features)
         
