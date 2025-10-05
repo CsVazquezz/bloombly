@@ -193,6 +193,7 @@ function renderDatasetContent() {
         <option value="blooms">Bloom Observations</option>
         <option value="flowering_sites">Flowering Sites</option>
         <option value="wildflower_aoi">Wildflower AOI</option>
+        <option value="kaggle">Kaggle Cherry Blossom 2024</option>
       </select>
       
       <button id="loadDatasetBtn" class="load-dataset-btn">
@@ -450,7 +451,8 @@ async function loadDatasetData() {
   const datasetPaths = {
     'blooms': '../data/processed/blooms.geojson',
     'flowering_sites': '../data/geojson/flowering_sites.geojson',
-    'wildflower_aoi': '../data/geojson/WildflowerBlooms_AreaOfInterest.geojson'
+    'wildflower_aoi': '../data/geojson/WildflowerBlooms_AreaOfInterest.geojson',
+    'kaggle': '../data/geojson/kaggle.geojson'
   };
   
   const filePath = datasetPaths[datasetName];
