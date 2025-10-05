@@ -130,15 +130,26 @@ def evaluate_model():
     print("\n✓ Temporal Validation (train on past, test on future):")
     print("  Testing if model generalizes to future dates...")
     
-    # Add date column for temporal split
-    feature_data_with_date = predictor.feature_data.copy()
-    feature_data_with_date['date'] = pd.to_datetime(feature_data_with_date['date'])
-    feature_data_with_date = feature_data_with_date.sort_values('date')
+    # Reconstruct date information from historical_blooms and negative_examples
+    # Combine them to get date info
+    all_data = pd.concat([
+        predictor.historical_blooms[['scientificName', 'lat', 'lon', 'date', 'day_of_year']].assign(bloom=1),
+        predictor.negative_examples[['scientificName', 'lat', 'lon', 'date', 'day_of_year']].assign(bloom=0)
+    ], ignore_index=True)
+    
+    all_data['date'] = pd.to_datetime(all_data['date'])
+    all_data = all_data.sort_values('date').reset_index(drop=True)
     
     # Split: train on first 80%, test on last 20%
-    split_idx = int(len(feature_data_with_date) * 0.8)
-    train_data = feature_data_with_date.iloc[:split_idx]
-    test_data = feature_data_with_date.iloc[split_idx:]
+    split_idx = int(len(all_data) * 0.8)
+    train_indices = all_data.index[:split_idx]
+    test_indices = all_data.index[split_idx:]
+    
+    # Use feature_data rows corresponding to these indices
+    train_data = predictor.feature_data.iloc[train_indices]
+    test_data = predictor.feature_data.iloc[test_indices]
+    train_dates = all_data.iloc[train_indices]
+    test_dates = all_data.iloc[test_indices]
     
     X_train = train_data[predictor.feature_columns].fillna(0)
     y_train = train_data['bloom']
@@ -161,8 +172,8 @@ def evaluate_model():
     y_test_proba = model_temp.predict_proba(X_test_scaled)[:, 1]
     
     print("  " + "-" * 70)
-    print(f"  Train period: {train_data['date'].min().date()} to {train_data['date'].max().date()}")
-    print(f"  Test period:  {test_data['date'].min().date()} to {test_data['date'].max().date()}")
+    print(f"  Train period: {train_dates['date'].min().date()} to {train_dates['date'].max().date()}")
+    print(f"  Test period:  {test_dates['date'].min().date()} to {test_dates['date'].max().date()}")
     print(f"  Train samples: {len(train_data)}")
     print(f"  Test samples:  {len(test_data)}")
     print("  " + "-" * 70)
