@@ -9,11 +9,11 @@ export function initDatasetSidebar() {
     <div id="dataset-legend">
       <!-- Dataset Data Controls -->
       <div class="filter-section">
-        <h4>📊 Load Dataset</h4>
+        <h4>Load Dataset</h4>
         
         <label style="font-size: 12px; margin-bottom: 8px;">
           Select Dataset:
-          <select id="datasetSelect" style="width: 100%; padding: 4px; margin-top: 4px;">
+          <select id="datasetSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 2px solid rgba(78, 217, 217, 0.3); border-radius: 6px; outline: none;">
             <option value="">-- Choose Dataset --</option>
             <option value="blooms">Bloom Observations</option>
             <option value="flowering_sites">Flowering Sites</option>
@@ -21,14 +21,9 @@ export function initDatasetSidebar() {
           </select>
         </label>
         
-        <button id="loadDatasetBtn" style="width: 100%; padding: 8px; margin-top: 8px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
-          📂 Load Data
+        <button id="loadDatasetBtn" class="load-dataset-btn">
+          Load Data
         </button>
-        
-        <div id="datasetInfo" style="margin-top: 8px; font-size: 10px; color: #9CA3AF; display: none;">
-          <p style="margin: 4px 0;"><strong>Status:</strong> <span id="datasetStatus">-</span></p>
-          <p style="margin: 4px 0;"><strong>Points:</strong> <span id="datasetCount">-</span></p>
-        </div>
       </div>
       
       <!-- Point Style Section -->
@@ -122,7 +117,7 @@ function attachDatasetSidebarEventListeners() {
   
   // Point color switcher
   const pointColorSwitcher = document.getElementById('datasetPointColorSwitcher');
-  const pointColorOptions = ['Single Color', 'By Family'];
+  const pointColorOptions = ['Single Color', 'By Family', 'By Genus'];
   
   document.querySelectorAll('[data-target="datasetPointColorSwitcher"]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -188,11 +183,13 @@ function handleDatasetPointStyleChange(index) {
 }
 
 function handleDatasetPointColorChange(index) {
-  // 0: Single Color, 1: Color by Family
+  // 0: Single Color, 1: Color by Family, 2: Color by Genus
   if (index === 0) {
     state.currentColorMode = COLOR_MODE.DEFAULT;
-  } else {
+  } else if (index === 1) {
     state.currentColorMode = COLOR_MODE.FAMILY;
+  } else if (index === 2) {
+    state.currentColorMode = COLOR_MODE.GENUS;
   }
   
   updateDatasetLegend();
@@ -221,9 +218,6 @@ function handleDatasetToggleClouds(e) {
 async function loadDatasetData() {
   const datasetName = document.getElementById('datasetSelect').value;
   const btn = document.getElementById('loadDatasetBtn');
-  const statusEl = document.getElementById('datasetStatus');
-  const countEl = document.getElementById('datasetCount');
-  const infoEl = document.getElementById('datasetInfo');
   
   if (!datasetName) {
     alert('Please select a dataset');
@@ -244,12 +238,11 @@ async function loadDatasetData() {
     return;
   }
   
-  // Show loading
+  // Show loading state
   const originalText = btn.textContent;
-  btn.textContent = '⏳ Loading...';
+  btn.textContent = 'Loading...';
   btn.disabled = true;
-  statusEl.textContent = 'Loading...';
-  infoEl.style.display = 'block';
+  btn.classList.add('loading');
   
   try {
     const response = await fetch(filePath);
@@ -301,20 +294,33 @@ async function loadDatasetData() {
     // Switch to points mode to display the data
     switchToPointsMode();
     
-    // Update status
-    statusEl.textContent = 'Loaded ✓';
-    countEl.textContent = allFeatures.length.toLocaleString();
+    // Show success state briefly
+    btn.textContent = 'Loaded ✓';
+    btn.classList.remove('loading');
+    btn.classList.add('success');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('success');
+      btn.disabled = false;
+    }, 1500);
     
     console.log('Globe updated with', state.pointsData.length, 'points from dataset');
-    alert(`✅ Loaded ${allFeatures.length.toLocaleString()} data points!`);
   } catch (err) {
     console.error('Dataset load failed:', err);
-    statusEl.textContent = 'Error ✗';
-    countEl.textContent = '-';
+    
+    // Show error state
+    btn.textContent = 'Error ✗';
+    btn.classList.remove('loading');
+    btn.classList.add('error');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('error');
+      btn.disabled = false;
+    }, 2000);
+    
     alert('Error loading dataset: ' + err.message);
-  } finally {
-    btn.textContent = originalText;
-    btn.disabled = false;
   }
 }
 
@@ -322,6 +328,7 @@ export function updateDatasetLegend() {
   const colorsLegend = document.getElementById('datasetColorsLegend');
   
   if (state.currentColorMode === COLOR_MODE.FAMILY) {
+    // Show family colors only - all genera in a family use the same color
     const familyCounts = {};
     state.geojsonFeatures.forEach(f => {
       const family = f.properties.Family;
@@ -333,6 +340,7 @@ export function updateDatasetLegend() {
       .map(([family]) => family);
     
     let html = '<h4>Colors</h4><div class="colors-list">';
+    
     sortedFamilies.forEach(family => {
       html += `
         <div class="color-item">
@@ -341,6 +349,55 @@ export function updateDatasetLegend() {
         </div>
       `;
     });
+    
+    html += '</div>';
+    
+    colorsLegend.innerHTML = html;
+    colorsLegend.style.display = 'block';
+  } else if (state.currentColorMode === COLOR_MODE.GENUS) {
+    // Show all genus colors grouped by family with different shades
+    const familyCounts = {};
+    const generaByFamily = {};
+    
+    state.geojsonFeatures.forEach(f => {
+      const family = f.properties.Family;
+      const genus = f.properties.Genus;
+      
+      familyCounts[family] = (familyCounts[family] || 0) + 1;
+      
+      if (!generaByFamily[family]) {
+        generaByFamily[family] = new Set();
+      }
+      generaByFamily[family].add(genus);
+    });
+    
+    const sortedFamilies = Object.entries(familyCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([family]) => family);
+    
+    let html = '<h4>Colors</h4><div class="colors-list" style="gap: 1px;">';
+    
+    sortedFamilies.forEach(family => {
+      // Add family header with main color - compact spacing
+      html += `
+        <div class="color-item" style="font-weight: bold; margin-top: 3px; padding: 2px 3px; background: rgba(78, 217, 217, 0.05); line-height: 1.2;">
+          <div class="color-box" style="background-color: ${state.familyColors[family]}; width: 9px; height: 9px; border: 1.5px solid rgba(78, 217, 217, 0.5); margin-right: 4px;"></div>
+          <span style="font-size: 9px;">${family}</span>
+        </div>
+      `;
+      
+      // Add all genera in this family with their unique shades - very compact
+      const genera = Array.from(generaByFamily[family]).sort();
+      genera.forEach(genus => {
+        html += `
+          <div class="color-item" style="padding: 0.5px 3px 0.5px 10px; line-height: 1.2;">
+            <div class="color-box" style="background-color: ${state.genusColors[genus]}; width: 6px; height: 6px; margin-right: 3px;"></div>
+            <span style="font-size: 9px;">${genus}</span>
+          </div>
+        `;
+      });
+    });
+    
     html += '</div>';
     
     colorsLegend.innerHTML = html;

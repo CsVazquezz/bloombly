@@ -1,30 +1,89 @@
 /* Left Sidebar - Dataset Controls */
 #dataset-legend {
   position: absolute;
-  top: 90px;
+  top: 40px;
   left: 20px;
-  bottom: 100px;
+  bottom: 20px;
   background: transparent;
   padding: 16px;
   border-radius: 12px;
   font-size: 11px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 60px);
   overflow-y: auto;
-  width: 170px;
+  width: 160px;
   pointer-events: none;
   display: flex;
   flex-direction: column;
 }
 
+/* Load Dataset Button Styles */
+.load-dataset-btn {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: #4ED9D9;
+  color: #0F1115;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(78, 217, 217, 0.3);
+}
+
+.load-dataset-btn:hover:not(:disabled) {
+  background: #6ee5e5;
+  box-shadow: 0 4px 12px rgba(78, 217, 217, 0.5);
+  transform: translateY(-1px);
+}
+
+.load-dataset-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.load-dataset-btn.loading {
+  background: rgba(78, 217, 217, 0.3);
+  color: #9CA3AF;
+  cursor: wait;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.load-dataset-btn.success {
+  background: #22c55e;
+  color: white;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+}
+
+.load-dataset-btn.error {
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.load-dataset-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 #datasetColorsLegend {
   position: absolute;
-  left: 210px;
-  bottom: 100px;
+  left: 200px;
+  bottom: 30px;
   background: transparent;
   padding: 12px;
   border-radius: 8px;
   font-size: 10px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 40px);
   overflow-y: auto;
   width: 140px;
   pointer-events: none;
@@ -36,16 +95,16 @@
 /* Right Sidebar - Prediction Controls */
 #prediction-legend {
   position: absolute;
-  top: 90px;
+  top: 40px;
   right: 20px;
-  bottom: 100px;
+  bottom: 20px;
   background: transparent;
   padding: 16px;
   border-radius: 12px;
   font-size: 11px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 60px);
   overflow-y: auto;
-  width: 170px;
+  width: 160px;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -53,13 +112,13 @@
 
 #predColorsLegend {
   position: absolute;
-  right: 210px;
-  bottom: 100px;
+  right: 200px;
+  bottom: 20px;
   background: transparent;
   padding: 12px;
   border-radius: 8px;
   font-size: 10px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 40px);
   overflow-y: auto;
   width: 140px;
   pointer-events: none;
@@ -71,16 +130,16 @@
 /* Legacy support for old sidebar (keep for backward compatibility) */
 #legend {
   position: absolute;
-  top: 90px;
+  top: 40px;
   left: 20px;
-  bottom: 100px;
+  bottom: 20px;
   background: transparent;
   padding: 16px;
   border-radius: 12px;
   font-size: 11px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 60px);
   overflow-y: auto;
-  width: 170px;
+  width: 160px;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -88,13 +147,13 @@
 
 #colorsLegend {
   position: absolute;
-  left: 210px;
-  bottom: 100px;
+  left: 200px;
+  bottom: 20px;
   background: transparent;
   padding: 12px;
   border-radius: 8px;
   font-size: 10px;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 40px);
   overflow-y: auto;
   width: 140px;
   pointer-events: none;
@@ -456,30 +515,37 @@
 }
 
 #speciesSearch,
-#familySearch {
+#familySearch,
+#datasetFamilySearch,
+#datasetSpeciesSearch {
   width: 100%;
-  padding: 6px 10px;
+  padding: 6px 8px;
   font-size: 10px;
   margin-bottom: 6px;
   border: 2px solid rgba(78, 217, 217, 0.3);
-  border-radius: 16px;
+  border-radius: 8px;
   background: #121418;
   backdrop-filter: blur(10px);
   color: #FFFFFF;
   outline: none;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
   box-sizing: border-box;
+  font-weight: 200;
 }
 
 #speciesSearch::placeholder,
-#familySearch::placeholder {
+#familySearch::placeholder,
+#datasetFamilySearch::placeholder,
+#datasetSpeciesSearch::placeholder {
   color: #9CA3AF;
 }
 
 #speciesSearch:focus,
-#familySearch:focus {
+#familySearch:focus,
+#datasetFamilySearch:focus,
+#datasetSpeciesSearch:focus {
   border-color: #4ED9D9;
-  background: #0F1115;
+  background: #1B1F25;
   box-shadow: 0 0 8px rgba(78, 217, 217, 0.2);
 }
 
