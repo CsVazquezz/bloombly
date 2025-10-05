@@ -83,92 +83,96 @@ class CombinedGeoJSONGenerator:
         
         return ml_df
     
-    def create_point_feature(self, lat, lon, name, bloom_date, bloom_day, source, 
-                            country=None, prefecture=None):
-        """Create a GeoJSON Point feature"""
-        # Color coding
-        colors = {
-            'kaggle': '#0066FF',  # Blue
-            'ml_model': '#FF0066'  # Red/Pink
+    def create_polygon_feature(self, lat, lon, name, bloom_date, bloom_day, source, 
+                              country=None, prefecture=None, radius_deg=0.05):
+        """Create a GeoJSON MultiPolygon feature matching flowering_sites.geojson format"""
+        # Family names based on source
+        family_names = {
+            'kaggle': 'Kaggle_Forecast_2024',
+            'ml_model': 'ML_Model_Prediction'
         }
+        
+        # Create octagon polygon around point
+        import math
+        polygon_coords = []
+        num_points = 8
+        for i in range(num_points + 1):  # +1 to close the polygon
+            angle = (2 * math.pi * i) / num_points
+            point_lon = lon + (radius_deg * math.cos(angle))
+            point_lat = lat + (radius_deg * math.sin(angle))
+            polygon_coords.append([point_lon, point_lat])
+        
+        # Calculate approximate area (km²)
+        area_km2 = math.pi * (radius_deg * 111) ** 2  # rough conversion
         
         return {
             "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [float(lon), float(lat)]
-            },
             "properties": {
-                "name": name,
-                "country": country or "Japan",
-                "prefecture": prefecture,
+                "id": name,
+                "Family": family_names[source],
+                "Genus": name,
+                "Season": "Spring",
+                "Area": round(area_km2, 3),
+                "year": 2024,
                 "bloom_date": str(bloom_date),
-                "bloom_day_of_year": int(bloom_day),
+                "bloom_day": int(bloom_day),
                 "source": source,
-                "color": colors[source],
-                "size": 8 if source == 'ml_model' else 6,
-                "label": f"{source.upper()}: {bloom_date}",
-                "description": f"Predicted bloom: {bloom_date} (Day {bloom_day})"
+                "country": country or "Japan",
+                "prefecture": prefecture
+            },
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [[polygon_coords]]
             }
         }
     
     def create_combined_geojson(self, kaggle_df, ml_df, output_path):
-        """Create combined GeoJSON with both datasets"""
+        """Create combined GeoJSON matching flowering_sites.geojson format"""
         print("\n[3/4] Creating combined GeoJSON...")
         
         features = []
         
-        # Add Kaggle forecasts (BLUE)
+        # Add Kaggle forecasts (Family: Kaggle_Forecast_2024)
         if kaggle_df is not None:
             for _, row in kaggle_df.iterrows():
-                feature = self.create_point_feature(
+                feature = self.create_polygon_feature(
                     lat=row['lat'],
                     lon=row['lon'],
                     name=row['spot_name'],
                     bloom_date=row['bloom_date'].strftime('%Y-%m-%d'),
                     bloom_day=row['bloom_day'],
                     source='kaggle',
-                    prefecture=row['prefecture_en']
+                    prefecture=row['prefecture_en'],
+                    radius_deg=0.03  # Smaller polygons for Kaggle (many points)
                 )
                 features.append(feature)
-            print(f"  ✓ Added {len(kaggle_df)} Kaggle forecasts (BLUE)")
+            print(f"  ✓ Added {len(kaggle_df)} Kaggle forecasts (Family: Kaggle_Forecast_2024)")
         
-        # Add ML model predictions (RED)
+        # Add ML model predictions (Family: ML_Model_Prediction)
         if ml_df is not None:
             for _, row in ml_df.iterrows():
-                feature = self.create_point_feature(
+                feature = self.create_polygon_feature(
                     lat=row['lat'],
                     lon=row['lon'],
                     name=row['city'],
                     bloom_date=row['bloom_date'],
                     bloom_day=row['bloom_day'],
                     source='ml_model',
-                    country=row['country']
+                    country=row['country'],
+                    radius_deg=0.08  # Larger polygons for ML predictions (fewer points)
                 )
                 features.append(feature)
-            print(f"  ✓ Added {len(ml_df)} ML predictions (RED)")
+            print(f"  ✓ Added {len(ml_df)} ML predictions (Family: ML_Model_Prediction)")
         
-        # Create GeoJSON structure
+        # Create GeoJSON structure matching flowering_sites.geojson
         geojson = {
             "type": "FeatureCollection",
-            "metadata": {
-                "title": "Cherry Blossom Bloom Predictions 2024 - Comparison",
-                "description": "Combined visualization of Kaggle forecasts (BLUE) and ML model predictions (RED)",
-                "year": 2024,
-                "generated": datetime.now().isoformat(),
-                "sources": {
-                    "kaggle": {
-                        "count": len(kaggle_df) if kaggle_df is not None else 0,
-                        "color": "#0066FF",
-                        "description": "Kaggle cherry blossom forecasts"
-                    },
-                    "ml_model": {
-                        "count": len(ml_df) if ml_df is not None else 0,
-                        "color": "#FF0066",
-                        "description": "ML model predictions (NDVI + environmental features)"
-                    }
-                },
-                "total_features": len(features)
+            "name": "Cherry_Blossom_Predictions_2024",
+            "crs": {
+                "type": "name",
+                "properties": {
+                    "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+                }
             },
             "features": features
         }
@@ -205,14 +209,14 @@ class CombinedGeoJSONGenerator:
         print("=" * 70)
         
         if stats['kaggle']['count'] > 0:
-            print(f"\n🔵 KAGGLE FORECASTS:")
+            print(f"\n� KAGGLE FORECASTS (Family: Kaggle_Forecast_2024):")
             print(f"   Locations: {stats['kaggle']['count']}")
             print(f"   Earliest:  {stats['kaggle']['earliest_bloom']}")
             print(f"   Latest:    {stats['kaggle']['latest_bloom']}")
             print(f"   Avg day:   {stats['kaggle']['avg_bloom_day']:.1f}")
         
         if stats['ml_model']['count'] > 0:
-            print(f"\n🔴 ML MODEL PREDICTIONS:")
+            print(f"\n🌸 ML MODEL PREDICTIONS (Family: ML_Model_Prediction):")
             print(f"   Locations: {stats['ml_model']['count']}")
             print(f"   Earliest:  {stats['ml_model']['earliest_bloom']}")
             print(f"   Latest:    {stats['ml_model']['latest_bloom']}")
@@ -252,10 +256,14 @@ def main():
     print("=" * 70)
     print(f"\nOutput file: {output_path}")
     print(f"Total predictions: {len(geojson['features'])}")
-    print("\nVisualization colors:")
-    print("  🔵 BLUE (#0066FF)  = Kaggle forecasts")
-    print("  🔴 RED  (#FF0066)  = ML model predictions")
-    print("\nLoad this GeoJSON in your globe.gl frontend!")
+    print("\nGeoJSON Format: MultiPolygon (matching flowering_sites.geojson)")
+    print("Family values:")
+    print("  📘 Kaggle_Forecast_2024   = Kaggle forecasts")
+    print("  🌸 ML_Model_Prediction    = ML model predictions")
+    print("\nFilter by 'Family' property in your frontend!")
+    print("\nUsage in globe.gl:")
+    print("  - Filter: features.filter(f => f.properties.Family === 'ML_Model_Prediction')")
+    print("  - Color by Family for visual distinction")
 
 
 if __name__ == "__main__":
