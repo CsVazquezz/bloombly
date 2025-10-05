@@ -95,7 +95,7 @@ function attachSidebarEventListeners() {
   
   // Point color switcher
   const pointColorSwitcher = document.getElementById('pointColorSwitcher');
-  const pointColorOptions = ['Single Color', 'By Family'];
+  const pointColorOptions = ['Single Color', 'By Family', 'By Genus'];
   
   document.querySelectorAll('[data-target="pointColorSwitcher"]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -161,11 +161,13 @@ function handlePointStyleChange(index) {
 }
 
 function handlePointColorChange(index) {
-  // 0: Single Color, 1: Color by Family
+  // 0: Single Color, 1: Color by Family, 2: Color by Genus
   if (index === 0) {
     state.currentColorMode = COLOR_MODE.DEFAULT;
-  } else {
+  } else if (index === 1) {
     state.currentColorMode = COLOR_MODE.FAMILY;
+  } else if (index === 2) {
+    state.currentColorMode = COLOR_MODE.GENUS;
   }
   
   updateLegend();
@@ -195,6 +197,7 @@ export function updateLegend() {
   const colorsLegend = document.getElementById('colorsLegend');
   
   if (state.currentColorMode === COLOR_MODE.FAMILY) {
+    // Show family colors only - all genera in a family use the same color
     const familyCounts = {};
     state.geojsonFeatures.forEach(f => {
       const family = f.properties.Family;
@@ -206,6 +209,7 @@ export function updateLegend() {
       .map(([family]) => family);
     
     let html = '<h4>Colors</h4><div class="colors-list">';
+    
     sortedFamilies.forEach(family => {
       html += `
         <div class="color-item">
@@ -214,6 +218,55 @@ export function updateLegend() {
         </div>
       `;
     });
+    
+    html += '</div>';
+    
+    colorsLegend.innerHTML = html;
+    colorsLegend.style.display = 'block';
+  } else if (state.currentColorMode === COLOR_MODE.GENUS) {
+    // Show all genus colors grouped by family with different shades
+    const familyCounts = {};
+    const generaByFamily = {};
+    
+    state.geojsonFeatures.forEach(f => {
+      const family = f.properties.Family;
+      const genus = f.properties.Genus;
+      
+      familyCounts[family] = (familyCounts[family] || 0) + 1;
+      
+      if (!generaByFamily[family]) {
+        generaByFamily[family] = new Set();
+      }
+      generaByFamily[family].add(genus);
+    });
+    
+    const sortedFamilies = Object.entries(familyCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([family]) => family);
+    
+    let html = '<h4>Colors</h4><div class="colors-list" style="gap: 1px;">';
+    
+    sortedFamilies.forEach(family => {
+      // Add family header with main color - compact spacing
+      html += `
+        <div class="color-item" style="font-weight: bold; margin-top: 3px; padding: 2px 3px; background: rgba(78, 217, 217, 0.05); line-height: 1.2;">
+          <div class="color-box" style="background-color: ${state.familyColors[family]}; width: 9px; height: 9px; border: 1.5px solid rgba(78, 217, 217, 0.5); margin-right: 4px;"></div>
+          <span style="font-size: 9px;">${family}</span>
+        </div>
+      `;
+      
+      // Add all genera in this family with their unique shades - very compact
+      const genera = Array.from(generaByFamily[family]).sort();
+      genera.forEach(genus => {
+        html += `
+          <div class="color-item" style="padding: 0.5px 3px 0.5px 10px; line-height: 1.2;">
+            <div class="color-box" style="background-color: ${state.genusColors[genus]}; width: 6px; height: 6px; margin-right: 3px;"></div>
+            <span style="font-size: 9px;">${genus}</span>
+          </div>
+        `;
+      });
+    });
+    
     html += '</div>';
     
     colorsLegend.innerHTML = html;

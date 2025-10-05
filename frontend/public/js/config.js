@@ -19,7 +19,7 @@ export const CONFIG = {
   RING_PROPAGATION_SPEED: 0.5,
   RING_REPEAT_PERIOD: 500,
   
-  DEFAULT_COLOR: '#4ED9D9ff', // Green mint (pulse of life color)
+  DEFAULT_COLOR: '#ff0a48ff', // Green mint (pulse of life color)
   
   INITIAL_VIEW: {
     lat: 37,
@@ -30,7 +30,8 @@ export const CONFIG = {
 
 export const COLOR_MODE = {
   DEFAULT: 'default',
-  FAMILY: 'family'
+  FAMILY: 'family',
+  GENUS: 'genus'
 };
 
 export const DISPLAY_MODE = {
