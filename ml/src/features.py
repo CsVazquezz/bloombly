@@ -271,6 +271,143 @@ class BloomFeatureEngineer:
             'soil_nitrogen_5-15cm': np.nan,
         }
     
+    def get_ndvi_gee(self, latitude: float, longitude: float, bloom_date: datetime) -> Dict[str, float]:
+        """
+        Get NDVI (vegetation index) from Google Earth Engine using Landsat 8/9 or Sentinel-2.
+        NDVI indicates vegetation greenness and spring green-up timing.
+        
+        Args:
+            latitude: Latitude in degrees
+            longitude: Longitude in degrees
+            bloom_date: Date of bloom observation
+            
+        Returns:
+            Dictionary with NDVI features at different time windows
+        """
+        if not self.use_gee:
+            print(f"  GEE not available, skipping NDVI data")
+            return self._get_default_ndvi_features()
+        
+        try:
+            # Create point geometry
+            point = ee.Geometry.Point([longitude, latitude])
+            
+            # Create buffer for regional average (1km radius)
+            region = point.buffer(1000)
+            
+            ndvi_features = {}
+            
+            # Use Sentinel-2 (better spatial/temporal resolution)
+            # Backup with Landsat 8/9 if Sentinel unavailable
+            
+            # Define time windows before bloom
+            windows = {
+                '7d': 7,
+                '14d': 14,
+                '30d': 30,
+                '60d': 60
+            }
+            
+            for window_name, days in windows.items():
+                start_date = (bloom_date - timedelta(days=days)).strftime('%Y-%m-%d')
+                end_date = (bloom_date - timedelta(days=1)).strftime('%Y-%m-%d')
+                
+                try:
+                    # Try Sentinel-2 first (10m resolution, 5-day revisit)
+                    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
+                        .filterBounds(region) \
+                        .filterDate(start_date, end_date) \
+                        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+                    
+                    if s2.size().getInfo() > 0:
+                        # Calculate NDVI for Sentinel-2
+                        def calc_ndvi_s2(image):
+                            ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI')
+                            return image.addBands(ndvi)
+                        
+                        s2_ndvi = s2.map(calc_ndvi_s2).select('NDVI')
+                        
+                        # Get statistics
+                        stats = s2_ndvi.mean().reduceRegion(
+                            reducer=ee.Reducer.mean().combine(
+                                ee.Reducer.stdDev(), '', True
+                            ).combine(
+                                ee.Reducer.max(), '', True
+                            ).combine(
+                                ee.Reducer.min(), '', True
+                            ),
+                            geometry=region,
+                            scale=10,
+                            maxPixels=1e9
+                        ).getInfo()
+                        
+                        ndvi_features[f'ndvi_mean_{window_name}'] = stats.get('NDVI_mean')
+                        ndvi_features[f'ndvi_stddev_{window_name}'] = stats.get('NDVI_stdDev')
+                        ndvi_features[f'ndvi_max_{window_name}'] = stats.get('NDVI_max')
+                        
+                    else:
+                        # Fallback to Landsat 8/9 (30m resolution)
+                        l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2') \
+                            .merge(ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')) \
+                            .filterBounds(region) \
+                            .filterDate(start_date, end_date) \
+                            .filter(ee.Filter.lt('CLOUD_COVER', 20))
+                        
+                        if l8.size().getInfo() > 0:
+                            def calc_ndvi_l8(image):
+                                ndvi = image.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
+                                return image.addBands(ndvi)
+                            
+                            l8_ndvi = l8.map(calc_ndvi_l8).select('NDVI')
+                            
+                            stats = l8_ndvi.mean().reduceRegion(
+                                reducer=ee.Reducer.mean().combine(
+                                    ee.Reducer.stdDev(), '', True
+                                ),
+                                geometry=region,
+                                scale=30,
+                                maxPixels=1e9
+                            ).getInfo()
+                            
+                            ndvi_features[f'ndvi_mean_{window_name}'] = stats.get('NDVI_mean')
+                            ndvi_features[f'ndvi_stddev_{window_name}'] = stats.get('NDVI_stdDev')
+                        else:
+                            # No imagery available for this window
+                            ndvi_features[f'ndvi_mean_{window_name}'] = None
+                            ndvi_features[f'ndvi_stddev_{window_name}'] = None
+                            ndvi_features[f'ndvi_max_{window_name}'] = None
+                
+                except Exception as e:
+                    print(f"  NDVI {window_name} failed: {str(e)}")
+                    ndvi_features[f'ndvi_mean_{window_name}'] = None
+                    ndvi_features[f'ndvi_stddev_{window_name}'] = None
+                    ndvi_features[f'ndvi_max_{window_name}'] = None
+            
+            # Calculate NDVI trend (green-up rate)
+            if (ndvi_features.get('ndvi_mean_7d') is not None and 
+                ndvi_features.get('ndvi_mean_30d') is not None):
+                ndvi_features['ndvi_trend_30d'] = round(
+                    (ndvi_features['ndvi_mean_7d'] - ndvi_features['ndvi_mean_30d']) / 23, 4
+                )
+            else:
+                ndvi_features['ndvi_trend_30d'] = None
+            
+            return ndvi_features
+            
+        except Exception as e:
+            print(f"  GEE NDVI request failed: {str(e)}")
+            return self._get_default_ndvi_features()
+    
+    def _get_default_ndvi_features(self) -> Dict[str, float]:
+        """Return default NDVI features when GEE not available"""
+        features = {}
+        for window in ['7d', '14d', '30d', '60d']:
+            features[f'ndvi_mean_{window}'] = np.nan
+            features[f'ndvi_stddev_{window}'] = np.nan
+            features[f'ndvi_max_{window}'] = np.nan
+        features['ndvi_trend_30d'] = np.nan
+        return features
+    
     def calculate_gdd(self, temps: list, base_temp: float = 5.0) -> float:
         """
         Calculate Growing Degree Days (GDD).
@@ -441,17 +578,22 @@ class BloomFeatureEngineer:
         weather_features = self.get_weather_data(latitude, longitude, bloom_date, days_before=90)
         features.update(weather_features)
         
-        # 2. Soil properties (SoilGrids)
+        # 2. Soil properties (Google Earth Engine)
         print(f"   Fetching soil data...")
         soil_features = self.get_soil_properties(latitude, longitude)
         features.update(soil_features)
         
-        # 3. Elevation (Open-Elevation)
+        # 3. NDVI vegetation index (Google Earth Engine)
+        print(f"   Fetching NDVI vegetation data...")
+        ndvi_features = self.get_ndvi_gee(latitude, longitude, bloom_date)
+        features.update(ndvi_features)
+        
+        # 4. Elevation (Open-Elevation)
         print(f"   Fetching elevation...")
         elevation = self.get_elevation(latitude, longitude)
         features['elevation_m'] = elevation
         
-        # 4. Photoperiod calculations
+        # 5. Photoperiod calculations
         print(f"    Calculating photoperiod...")
         photoperiod_features = self.calculate_photoperiod_features(latitude, bloom_date)
         features.update(photoperiod_features)
