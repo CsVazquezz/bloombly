@@ -781,7 +781,7 @@ class ImprovedBloomPredictor:
         
         # Scale features
         self.scaler = StandardScaler()
-        X_scaled = self.scaler.fit_transform(X)
+        X_scaled = self.scaler.fit_transform(X.values)
         
         # Use time-series split for validation (respects temporal order)
         tscv = TimeSeriesSplit(n_splits=5)
@@ -1126,6 +1126,9 @@ class ImprovedBloomPredictor:
         model_data = joblib.load(path)
         self.model = model_data['model']
         self.scaler = model_data['scaler']
+        # Remove feature names to avoid warnings when transforming arrays
+        if hasattr(self.scaler, 'feature_names_in_'):
+            delattr(self.scaler, 'feature_names_in_')
         self.feature_columns = model_data['feature_columns']
         self.species_bloom_windows = model_data['species_bloom_windows']
         self.use_earth_engine = model_data.get('use_earth_engine', False)

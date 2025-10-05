@@ -80,7 +80,7 @@ def train_and_save_model(data_path='../data/raw/data.csv',
         y = predictor.feature_data['bloom'].copy()
         X = X.fillna(0)
         
-        X_scaled = predictor.scaler.transform(X)
+        X_scaled = predictor.scaler.transform(X.values)
         
         # Create new model with custom parameters
         predictor.model = GradientBoostingClassifier(
