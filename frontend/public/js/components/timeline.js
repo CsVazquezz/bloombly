@@ -1,6 +1,7 @@
 import { state } from '../state.js';
 import { DISPLAY_MODE } from '../config.js';
 import { switchToHexMode, switchToPointsMode } from '../globe.js';
+import { updateMetrics } from './metricsCard.js';
 
 export function initTimeline() {
   const container = document.getElementById('timeline-container');
@@ -134,6 +135,9 @@ export function applyTimelineFilter() {
   } else {
     switchToPointsMode();
   }
+  
+  // Update metrics after filter changes
+  updateMetrics();
 }
 
 function goToPreviousStep() {

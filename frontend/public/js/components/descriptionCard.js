@@ -47,16 +47,6 @@ export function showDescriptionCard(point, event, coords) {
         </div>
         
         <div class="info-row">
-          <span class="label">Season</span>
-          <span class="value">${point.Season || 'N/A'}</span>
-        </div>
-        
-        <div class="info-row">
-          <span class="label">Year</span>
-          <span class="value">${point.year || 'N/A'}</span>
-        </div>
-        
-        <div class="info-row">
           <span class="label">Area</span>
           <span class="value">${point.Area ? point.Area.toFixed(2) + ' km²' : 'N/A'}</span>
         </div>

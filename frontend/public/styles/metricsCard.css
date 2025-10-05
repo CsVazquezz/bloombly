@@ -1,0 +1,120 @@
+/* Metrics Card - Always Visible at Top Right */
+#metrics-card {
+  position: fixed;
+  top: 40px;
+  right: 20px;
+  width: 280px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 999;
+  pointer-events: auto;
+}
+
+.metrics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.metrics-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 200;
+  color: #4ED9D9;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.metrics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(18, 20, 24, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.metric-item:hover {
+  background: rgba(27, 31, 37, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.metric-label {
+  font-size: 11px;
+  color: #FFFFFF;
+  font-weight: 200;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.metric-sublabel {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 200;
+  margin-top: 2px;
+}
+
+.metric-value-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.metric-count {
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFFFFF;
+  transition: all 0.3s ease;
+}
+
+.metric-percentage-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.metric-percentage {
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.metric-percentage.positive {
+  color: #22c55e;
+}
+
+.metric-percentage.negative {
+  color: #ef4444;
+}
+
+.metric-percentage.neutral {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Update animation */
+.updating {
+  opacity: 0.3;
+  transform: scale(0.95);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #metrics-card {
+    width: calc(100% - 40px);
+    max-width: 280px;
+  }
+}

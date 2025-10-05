@@ -2,6 +2,7 @@ import { state } from '../state.js';
 import { COLOR_MODE, DISPLAY_MODE } from '../config.js';
 import { switchToHexMode, switchToPointsMode, toggleCloudsVisibility, refreshGlobeColors, applyGlobeStyle, setNightSkyBackground, removeNightSkyBackground } from '../globe.js';
 import { applyTimelineFilter } from './timeline.js';
+import { showMetricsCard, updateMetrics } from './metricsCard.js';
 
 // Sidebar mode state
 let currentMode = 'dataset'; // 'dataset' or 'prediction'
@@ -421,6 +422,10 @@ async function loadDatasetData() {
     updateLegend();
     switchToPointsMode();
     
+    // Show and update metrics card
+    showMetricsCard();
+    updateMetrics();
+    
     btn.textContent = 'Loaded ✓';
     btn.classList.remove('loading');
     btn.classList.add('success');
@@ -543,6 +548,10 @@ async function fetchPredictionData() {
     createFilterUI();
     updateLegend();
     switchToPointsMode();
+    
+    // Show and update metrics card
+    showMetricsCard();
+    updateMetrics();
     
     btn.textContent = 'Loaded ✓';
     btn.classList.remove('loading');
@@ -672,6 +681,7 @@ function handleFamilyFilterChange(event) {
   }
   
   applyTimelineFilter();
+  updateMetrics();
 }
 
 function handleGenusFilterChange(event) {
@@ -690,6 +700,7 @@ function handleGenusFilterChange(event) {
   }
   
   applyTimelineFilter();
+  updateMetrics();
 }
 
 // Prediction-specific filter functions
