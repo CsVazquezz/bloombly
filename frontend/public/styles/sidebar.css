@@ -417,6 +417,12 @@
   text-shadow: 0 0 2px rgba(78, 217, 217, 0.2);
 }
 
+/* Filter Content Section - Tighter spacing */
+.filter-content-section {
+  margin-top: 0 !important;
+  margin-bottom: 12px;
+}
+
 .toggle-row {
   display: flex;
   gap: 6px;

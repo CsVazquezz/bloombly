@@ -6,6 +6,8 @@ import { showMetricsCard, updateMetrics } from './metricsCard.js';
 
 // Sidebar mode state
 let currentMode = 'dataset'; // 'dataset' or 'prediction'
+let isDatasetContentInitialized = false;
+let isPredictionContentInitialized = false;
 
 export function initUnifiedSidebar() {
   const container = document.getElementById('unified-sidebar-container');
@@ -21,8 +23,11 @@ export function initUnifiedSidebar() {
           </div>
         </div>
         
-        <!-- Dynamic Content Section (changes based on mode) -->
-        <div id="dynamicContent"></div>
+        <!-- Dataset Tab Content -->
+        <div id="datasetTabContent" style="display: block;"></div>
+        
+        <!-- Prediction Tab Content -->
+        <div id="predictionTabContent" style="display: none;"></div>
       </div>
       
       <!-- Fixed Controls at Bottom -->
@@ -80,7 +85,13 @@ export function initUnifiedSidebar() {
   `;
 
   attachUnifiedSidebarEventListeners();
-  switchMode('dataset'); // Start with dataset mode
+  
+  // Initialize both tab contents
+  renderDatasetContent();
+  renderPredictionContent();
+  
+  // Start with dataset mode
+  switchMode('dataset');
 }
 
 function attachUnifiedSidebarEventListeners() {
@@ -151,22 +162,32 @@ function switchMode(mode) {
   const datasetBtn = document.getElementById('datasetModeBtn');
   const predictionBtn = document.getElementById('predictionModeBtn');
   
+  // Get tab content containers
+  const datasetTab = document.getElementById('datasetTabContent');
+  const predictionTab = document.getElementById('predictionTabContent');
+  
   if (mode === 'dataset') {
     datasetBtn.classList.add('active');
     predictionBtn.classList.remove('active');
-    renderDatasetContent();
+    datasetTab.style.display = 'block';
+    predictionTab.style.display = 'none';
   } else {
     predictionBtn.classList.add('active');
     datasetBtn.classList.remove('active');
-    renderPredictionContent();
+    datasetTab.style.display = 'none';
+    predictionTab.style.display = 'block';
   }
 }
 
 function renderDatasetContent() {
-  const dynamicContent = document.getElementById('dynamicContent');
-  dynamicContent.innerHTML = `
+  // Only render once
+  if (isDatasetContentInitialized) return;
+  
+  const datasetTabContent = document.getElementById('datasetTabContent');
+  datasetTabContent.innerHTML = `
     <!-- Dataset Data Controls -->
     <div class="filter-section">
+      <h4>Dataset</h4>
       <select id="datasetSelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none;">
         <option value="">-- Choose Dataset --</option>
         <option value="blooms">Bloom Observations</option>
@@ -179,18 +200,30 @@ function renderDatasetContent() {
       </button>
     </div>
     
-    <!-- Family Filter -->
-    <div class="filter-section">
-      <h4>Family</h4>
-      <input type="text" id="familySearch" placeholder="Search...">
-      <div class="checkbox-group" id="familyCheckboxes"></div>
-    </div>
-    
-    <!-- Genus Filter -->
-    <div class="filter-section">
-      <h4>Genus</h4>
-      <input type="text" id="speciesSearch" placeholder="Search...">
-      <div class="checkbox-group" id="genusCheckboxes"></div>
+    <!-- Filter Switcher (Hidden until data loaded) -->
+    <div id="filterSwitcherSection" style="display: none;">
+      <div class="filter-section">
+        <h4>Filter By</h4>
+        <div class="switcher-container">
+          <button class="switcher-prev" data-target="filterTypeSwitcher">‹</button>
+          <div class="style-switcher" id="filterTypeSwitcher" data-current="0">
+            <span class="switcher-value">Family</span>
+          </div>
+          <button class="switcher-next" data-target="filterTypeSwitcher">›</button>
+        </div>
+      </div>
+      
+      <!-- Family Filter -->
+      <div class="filter-section filter-content-section" id="familyFilterSection">
+        <input type="text" id="familySearch" placeholder="Search...">
+        <div class="checkbox-group" id="familyCheckboxes"></div>
+      </div>
+      
+      <!-- Genus Filter -->
+      <div class="filter-section filter-content-section" id="genusFilterSection" style="display: none;">
+        <input type="text" id="speciesSearch" placeholder="Search...">
+        <div class="checkbox-group" id="genusCheckboxes"></div>
+      </div>
     </div>
   `;
   
@@ -202,95 +235,122 @@ function renderDatasetContent() {
   document.getElementById('speciesSearch').addEventListener('input', (e) => {
     updateGenusCheckboxes(e.target.value);
   });
+  
+  // Filter type switcher
+  let currentFilterType = 0; // 0 = Family, 1 = Genus
+  const filterTypeOptions = ['Family', 'Genus'];
+  
+  document.querySelectorAll('[data-target="filterTypeSwitcher"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const isPrev = btn.classList.contains('switcher-prev');
+      currentFilterType = isPrev 
+        ? (currentFilterType - 1 + filterTypeOptions.length) % filterTypeOptions.length
+        : (currentFilterType + 1) % filterTypeOptions.length;
+      
+      // Update the switcher label
+      const filterTypeSwitcher = document.getElementById('filterTypeSwitcher');
+      if (filterTypeSwitcher) {
+        filterTypeSwitcher.querySelector('.switcher-value').textContent = filterTypeOptions[currentFilterType];
+      }
+      
+      handleFilterTypeChange(currentFilterType);
+    });
+  });
+  
+  isDatasetContentInitialized = true;
 }
 
 function renderPredictionContent() {
-  const dynamicContent = document.getElementById('dynamicContent');
-  dynamicContent.innerHTML = `
+  // Only render once
+  if (isPredictionContentInitialized) return;
+  
+  const predictionTabContent = document.getElementById('predictionTabContent');
+  predictionTabContent.innerHTML = `
     <!-- ML Prediction Controls -->
     <div class="filter-section">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <div>
-          <label style="font-size: 11px; color: #4ED9D9; font-weight: 200; display: block; margin-bottom: 4px;">
-            Confidence
-          </label>
-          <input type="number" id="predConfidenceInput" min="0" max="1" step="0.1" value="0.3" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px; box-sizing: border-box;">
-        </div>
-        <div>
-          <label style="font-size: 11px; color: #4ED9D9; font-weight: 200; display: block; margin-bottom: 4px;">
-            Count
-          </label>
+          <h4 style="margin: 0 0 4px 0;">Count</h4>
           <input type="number" id="predNumPredictionsInput" min="50" max="500" step="50" value="150" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px; box-sizing: border-box;">
         </div>
+        <div>
+          <h4 style="margin: 0 0 4px 0;">Confidence</h4>
+          <input type="number" id="predConfidenceInput" min="0" max="1" step="0.1" value="0.3" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px; box-sizing: border-box;">
+        </div>
       </div>
-      
-      <label style="font-size: 11px; margin-top: 8px; display: block; color: #4ED9D9; font-weight: 200;">
-        Location Type:
-        <select id="predAoiTypeSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
-          <option value="point">Point (Lat/Lon)</option>
-          <option value="state" selected>State</option>
-          <option value="country">Country</option>
-        </select>
-      </label>
-      
-      <!-- Point coordinates -->
-      <div id="predPointCoordinates" style="display:none; margin-top: 8px; font-size: 11px;">
-        <label>Lat: 
-          <input type="number" id="predLatInput" min="-90" max="90" step="0.01" placeholder="20.5" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
-        </label>
-        <label style="margin-left: 4px;">Lon: 
-          <input type="number" id="predLonInput" min="-180" max="180" step="0.01" placeholder="-100" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
-        </label>
-      </div>
-      
-      <!-- Country selection -->
-      <div id="predCountryOptions" style="display:none; margin-top: 8px;">
-        <label style="font-size: 11px; display: block; color: #4ED9D9; font-weight: 200;">
-          Country:
-          <select id="predAoiCountrySelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
-            <option value="">Select...</option>
-            <option value="Mexico">Mexico</option>
-            <option value="United States">United States</option>
-          </select>
-        </label>
-      </div>
-      
-      <!-- State selection -->
-      <div id="predStateOptions" style="display:block; margin-top: 8px;">
-        <label style="font-size: 11px; display: block; color: #4ED9D9; font-weight: 200;">
-          State:
-          <select id="predAoiStateSelect" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
-            <optgroup label="🇲🇽 Mexican States">
-              <option value="Queretaro" selected>Querétaro</option>
-              <option value="Jalisco">Jalisco</option>
-              <option value="Guanajuato">Guanajuato</option>
-              <option value="Mexico">México</option>
-              <option value="Michoacan">Michoacán</option>
-              <option value="Puebla">Puebla</option>
-              <option value="Veracruz">Veracruz</option>
-              <option value="Oaxaca">Oaxaca</option>
-              <option value="Chiapas">Chiapas</option>
-              <option value="Yucatan">Yucatán</option>
-            </optgroup>
-            <optgroup label="🇺🇸 US States">
-              <option value="California">California</option>
-              <option value="Texas">Texas</option>
-              <option value="Florida">Florida</option>
-              <option value="New York">New York</option>
-            </optgroup>
-          </select>
-        </label>
-      </div>
-      
-      <label style="font-size: 11px; margin-top: 8px; display: block; color: #4ED9D9; font-weight: 200;">
-        Date:
-        <input type="date" id="predDateInput" value="2025-10-05" style="width: 100%; padding: 4px; margin-top: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
-      </label>
-      
-      <button id="predFetchDataBtn" class="load-dataset-btn">
-        Predict Blooms
-      </button>
     </div>
+    
+    <div class="filter-section">
+      <h4>Location Type</h4>
+      <select id="predAoiTypeSelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
+        <option value="point">Point (Lat/Lon)</option>
+        <option value="state" selected>State</option>
+        <option value="country">Country</option>
+      </select>
+    </div>
+      
+    <!-- Point coordinates -->
+    <div id="predPointCoordinates" style="display:none; font-size: 11px;">
+      <label>Lat: 
+        <input type="number" id="predLatInput" min="-90" max="90" step="0.01" placeholder="20.5" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
+      </label>
+      <label style="margin-left: 4px;">Lon: 
+        <input type="number" id="predLonInput" min="-180" max="180" step="0.01" placeholder="-100" style="width: 60px; padding: 2px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 4px;">
+      </label>
+    </div>
+      
+    <!-- Country selection -->
+    <div id="predCountryOptions" class="filter-section" style="display:none;">
+      <h4>Country</h4>
+      <select id="predAoiCountrySelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
+        <option value="">Select...</option>
+        <option value="Mexico">Mexico</option>
+        <option value="United States">United States</option>
+      </select>
+    </div>
+      
+    <!-- State selection -->
+    <div id="predStateOptions" class="filter-section" style="display:block;">
+      <h4>State</h4>
+      <select id="predAoiStateSelect" style="width: 100%; padding: 4px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box;">
+        <optgroup label="🇲🇽 Mexican States">
+          <option value="Queretaro" selected>Querétaro</option>
+          <option value="Jalisco">Jalisco</option>
+          <option value="Guanajuato">Guanajuato</option>
+          <option value="Mexico">México</option>
+          <option value="Michoacan">Michoacán</option>
+          <option value="Puebla">Puebla</option>
+          <option value="Veracruz">Veracruz</option>
+          <option value="Oaxaca">Oaxaca</option>
+          <option value="Chiapas">Chiapas</option>
+          <option value="Yucatan">Yucatán</option>
+        </optgroup>
+        <optgroup label="🇺🇸 US States">
+          <option value="California">California</option>
+          <option value="Texas">Texas</option>
+          <option value="Florida">Florida</option>
+          <option value="New York">New York</option>
+        </optgroup>
+      </select>
+    </div>
+    
+    <div class="filter-section">
+      <h4>Date Range</h4>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <label style="font-size: 9px; color: rgba(255, 255, 255, 0.7); display: block; margin-bottom: 2px;">From:</label>
+          <input type="date" id="predStartDateInput" value="2025-10-05" style="width: 100%; padding: 6px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box; font-size: 11px;">
+        </div>
+        <div>
+          <label style="font-size: 9px; color: rgba(255, 255, 255, 0.7); display: block; margin-bottom: 2px;">To:</label>
+          <input type="date" id="predEndDateInput" placeholder="Optional" style="width: 100%; padding: 6px; background: #121418; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 6px; outline: none; box-sizing: border-box; font-size: 11px;">
+        </div>
+      </div>
+    </div>
+      
+    <button id="predFetchDataBtn" class="load-dataset-btn">
+      Predict Blooms
+    </button>
   `;
   
   // Attach prediction-specific listeners
@@ -301,7 +361,16 @@ function renderPredictionContent() {
     document.getElementById('predStateOptions').style.display = aoiType === 'state' ? 'block' : 'none';
   });
   
+  // Auto-focus to end date when start date is filled
+  document.getElementById('predStartDateInput').addEventListener('change', (e) => {
+    if (e.target.value) {
+      document.getElementById('predEndDateInput').focus();
+    }
+  });
+  
   document.getElementById('predFetchDataBtn').addEventListener('click', fetchPredictionData);
+  
+  isPredictionContentInitialized = true;
 }
 
 // Common control handlers
@@ -351,6 +420,21 @@ function handleToggleNightSky(e) {
 
 function handleToggleClouds(e) {
   toggleCloudsVisibility();
+}
+
+function handleFilterTypeChange(index) {
+  const familySection = document.getElementById('familyFilterSection');
+  const genusSection = document.getElementById('genusFilterSection');
+  
+  if (index === 0) {
+    // Show Family filter
+    familySection.style.display = 'block';
+    genusSection.style.display = 'none';
+  } else {
+    // Show Genus filter
+    familySection.style.display = 'none';
+    genusSection.style.display = 'block';
+  }
 }
 
 // Dataset loading function
@@ -422,6 +506,9 @@ async function loadDatasetData() {
     updateLegend();
     switchToPointsMode();
     
+    // Show filter sections after data is loaded
+    document.getElementById('filterSwitcherSection').style.display = 'block';
+    
     // Show and update metrics card
     showMetricsCard();
     updateMetrics();
@@ -457,18 +544,29 @@ async function loadDatasetData() {
 // Prediction fetching function
 async function fetchPredictionData() {
   const aoiType = document.getElementById('predAoiTypeSelect').value;
-  const date = document.getElementById('predDateInput').value;
+  const startDate = document.getElementById('predStartDateInput').value;
+  const endDate = document.getElementById('predEndDateInput').value;
   const confidence = document.getElementById('predConfidenceInput').value;
   const numPredictions = document.getElementById('predNumPredictionsInput').value;
   const btn = document.getElementById('predFetchDataBtn');
 
+  if (!startDate) {
+    alert('Please enter a start date');
+    return;
+  }
+
   const params = {
     aoi_type: aoiType,
-    date: date,
+    start_date: startDate,
     method: 'v2',
     confidence: confidence,
     num_predictions: numPredictions
   };
+  
+  // Add end date only if provided
+  if (endDate) {
+    params.end_date = endDate;
+  }
   
   if (aoiType === 'point') {
     const lat = document.getElementById('predLatInput').value;
