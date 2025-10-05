@@ -24,6 +24,9 @@
       border-radius: 8px;
       font-size: 12px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      max-height: 90vh;
+      overflow-y: auto;
+      max-width: 250px;
     }
     
     .control-buttons {
@@ -76,6 +79,12 @@
       display: flex;
       flex-direction: column;
       gap: 5px;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 5px;
+      border-radius: 3px;
+      background: white;
     }
     
     .checkbox-item {
@@ -96,6 +105,103 @@
       border: 1px solid #ccc;
       border-radius: 3px;
     }
+    
+    /* Timeline styles */
+    #timeline {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+    }
+    
+    #timelineLabel {
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    
+    #timelineLabel .year {
+      color: #2196F3;
+    }
+    
+    #timelineLabel .season {
+      color: #4CAF50;
+      margin-left: 10px;
+    }
+    
+    #timelineControls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    #timelineSlider {
+      flex: 1;
+      height: 8px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: linear-gradient(to right, #e0e0e0, #2196F3);
+      outline: none;
+      border-radius: 4px;
+    }
+    
+    #timelineSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #2196F3;
+      cursor: pointer;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    #timelineSlider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: #2196F3;
+      cursor: pointer;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      border: none;
+    }
+    
+    .timeline-btn {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      background-color: #2196F3;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s;
+      min-width: 80px;
+    }
+    
+    .timeline-btn:hover {
+      background-color: #1976D2;
+    }
+    
+    .timeline-btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    
+    #playPauseBtn {
+      min-width: 100px;
+      background-color: #4CAF50;
+    }
+    
+    #playPauseBtn:hover {
+      background-color: #45a049;
+    }
   </style>
 </head>
 <body>
@@ -106,24 +212,38 @@
       <button id="toggleCloudsBtn">Toggle Clouds</button>
       <button id="toggleRingsBtn">Toggle Rings</button>
       <button id="toggleModeBtn">Switch to Points</button>
+      <button id="toggleColorBtn">Color by Family</button>
     </div>
-    <div id="filters">
-      <div class="filter-section">
-        <h4>Filter by Season</h4>
-        <div id="seasonCheckboxes"></div>
-      </div>
-      <div class="filter-section">
-        <h4>Filter by Family</h4>
-        <input type="text" id="familySearch" placeholder="Search families...">
-        <div id="familyCheckboxes"></div>
-      </div>
-      <div class="filter-section">
-        <h4>Filter by Genus</h4>
-        <input type="text" id="genusSearch" placeholder="Search genus...">
-        <div id="genusCheckboxes"></div>
-      </div>
+    
+    <!-- Family Filter -->
+    <div class="filter-section">
+      <h4>Filter by Family</h4>
+      <input type="text" id="familySearch" placeholder="Search families...">
+      <div class="checkbox-group" id="familyCheckboxes"></div>
     </div>
+    
+    <!-- Genus/Species Filter -->
+    <div class="filter-section">
+      <h4>Filter by Genus (Species)</h4>
+      <input type="text" id="speciesSearch" placeholder="Search genus...">
+      <div class="checkbox-group" id="genusCheckboxes"></div>
+    </div>
+    
     <div id="legendContent"></div>
+  </div>
+  
+  <!-- Timeline Bar -->
+  <div id="timeline">
+    <div id="timelineLabel">
+      <span class="year">Year: <span id="currentYear">2000</span></span>
+      <span class="season">Season: <span id="currentSeason">Spring</span></span>
+    </div>
+    <div id="timelineControls">
+      <button class="timeline-btn" id="prevBtn">◀ Previous</button>
+      <button class="timeline-btn" id="playPauseBtn">▶ Play</button>
+      <input type="range" id="timelineSlider" min="0" max="100" value="0">
+      <button class="timeline-btn" id="nextBtn">Next ▶</button>
+    </div>
   </div>
 
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
@@ -133,7 +253,7 @@
     // ============================================================================
     // CONSTANTS
     // ============================================================================
-    const GEOJSON_FILES = ['output.geojson', 'pyrus.geojson','cactacae.geojson'];
+    const GEOJSON_FILES = ['../data/geojson/flowering_sites.geojson'];
     const CLOUDS_IMAGE_URL = './clouds.png';
     const EARTH_IMAGE_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
     const EARTH_TOPOLOGY_URL = '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
@@ -141,18 +261,19 @@
     const CLOUDS_ALTITUDE = 0.004;
     const CLOUDS_ROTATION_SPEED = -0.006; // degrees per frame
     
-    const HEX_POLYGON_RESOLUTION = 6;
+    const HEX_POLYGON_RESOLUTION = 5;
     const HEX_POLYGON_MARGIN = 0.3;
     
     const POINT_AREA_SCALE = 0.0000005;
-    const POINT_BASE_RADIUS = 0.03;
+    const POINT_BASE_RADIUS = 0.1;
     const RING_AREA_SCALE = 0.000003;
     const RING_BASE_RADIUS = 0.3;
-    const RING_PROPAGATION_SPEED = 0.1;
-    const RING_REPEAT_PERIOD = 1000;
+    const RING_PROPAGATION_SPEED = 0.5;
+    const RING_REPEAT_PERIOD = 500;
     
     const COLOR_MODE = {
-      SEASON: 'season'
+      DEFAULT: 'default',
+      FAMILY: 'family'
     };
     
     const DISPLAY_MODE = {
@@ -160,14 +281,10 @@
       POINTS: 'points'
     };
     
-    const SEASON_COLORS = {
-      'Spring': '#ff00ff',
-      'Summer': '#ff0000',
-      'Fall': '#ffa500',
-      'Winter': '#0000ff'
-    };
+    // Dynamic family colors - will be populated on load
+    const FAMILY_COLORS = {};
     
-    const DEFAULT_COLOR = '#ff7800';
+    const DEFAULT_COLOR = '#ffff00';  // Yellow
     
     const INITIAL_VIEW = {
       lat: 37,
@@ -181,15 +298,20 @@
     const state = {
       geojsonFeatures: [],
       pointsData: [],
-      currentColorMode: COLOR_MODE.SEASON,
-      currentDisplayMode: DISPLAY_MODE.HEX,
+      currentColorMode: COLOR_MODE.DEFAULT,
+      currentDisplayMode: DISPLAY_MODE.POINTS,
       cloudsMesh: null,
-      ringsEnabled: true,
+      ringsEnabled: false,
       allFamilies: new Set(),
       allGenus: new Set(),
-      selectedSeasons: new Set(['Spring', 'Summer', 'Fall', 'Winter']),
+      genusToFamily: new Map(), // Maps genus -> family
       selectedFamilies: new Set(),
       selectedGenus: new Set(),
+      allYears: [],
+      timelineSteps: [],
+      currentTimelineIndex: 0,
+      isPlaying: false,
+      playInterval: null,
       filteredFeatures: [],
       filteredPoints: []
     };
@@ -224,10 +346,26 @@
     // ============================================================================
     // COLOR FUNCTIONS
     // ============================================================================
+    function generateColorForFamily(family, index, total) {
+      // Generate distinct colors using HSL color space
+      const hue = (index * 360 / total) % 360;
+      const saturation = 70 + (index % 3) * 10; // 70-90%
+      const lightness = 50 + (index % 2) * 10; // 50-60%
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
+    
+    function initializeFamilyColors() {
+      const allFamiliesArray = Array.from(state.allFamilies).sort();
+      allFamiliesArray.forEach((family, index) => {
+        FAMILY_COLORS[family] = generateColorForFamily(family, index, allFamiliesArray.length);
+      });
+    }
+    
     function getColorForFeature(feature) {
-      if (state.currentColorMode === COLOR_MODE.SEASON) {
-        return SEASON_COLORS[feature.Season] || DEFAULT_COLOR;
+      if (state.currentColorMode === COLOR_MODE.FAMILY) {
+        return FAMILY_COLORS[feature.Family] || DEFAULT_COLOR;
       }
+      // Default mode - all flowers same color
       return DEFAULT_COLOR;
     }
 
@@ -263,11 +401,12 @@
       return {
         lat: center.lat,
         lng: center.lng,
-        Site: properties.Site,
+        Site: `${properties.Family} - ${properties.Genus}`,
         Family: properties.Family,
         Genus: properties.Genus,
         Season: properties.Season,
         Area: properties.Area,
+        year: properties.year,
         maxR: properties.Area * RING_AREA_SCALE + RING_BASE_RADIUS,
         propagationSpeed: RING_PROPAGATION_SPEED,
         repeatPeriod: RING_REPEAT_PERIOD
@@ -279,81 +418,319 @@
     // ============================================================================
     function createHexPolygonLabel({ properties: data }) {
       return `
-        <b>${data.Site}</b><br/>
-        Family: <i>${data.Family}</i><br/>
-        Genus: <i>${data.Genus}</i><br/>
+        <b>${data.Family} - ${data.Genus}</b><br/>
         Season: <i>${data.Season}</i><br/>
-        Area: <i>${data.Area}</i>
+        Area: <i>${data.Area.toFixed(2)} km²</i><br/>
+        Year: <i>${data.year}</i>
       `;
     }
     
     function updateLegend() {
       const legendContent = document.getElementById('legendContent');
       
-      if (state.currentColorMode === COLOR_MODE.SEASON) {
-        legendContent.innerHTML = `
-          <div class="legend-item">
-            <div class="color-box" style="background-color: ${SEASON_COLORS['Spring']};"></div>
-            <span>Spring</span>
-          </div>
-          <div class="legend-item">
-            <div class="color-box" style="background-color: ${SEASON_COLORS['Summer']};"></div>
-            <span>Summer</span>
-          </div>
-          <div class="legend-item">
-            <div class="color-box" style="background-color: ${SEASON_COLORS['Fall']};"></div>
-            <span>Fall</span>
-          </div>
-          <div class="legend-item">
-            <div class="color-box" style="background-color: ${SEASON_COLORS['Winter']};"></div>
-            <span>Winter</span>
-          </div>
-        `;
+      if (state.currentColorMode === COLOR_MODE.FAMILY) {
+        // Show all families in legend
+        const familyCounts = {};
+        state.geojsonFeatures.forEach(f => {
+          const family = f.properties.Family;
+          familyCounts[family] = (familyCounts[family] || 0) + 1;
+        });
+        
+        const sortedFamilies = Object.entries(familyCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(([family]) => family);
+        
+        let html = '<h4 style="margin: 10px 0 8px 0;">Families</h4>';
+        sortedFamilies.forEach(family => {
+          html += `
+            <div class="legend-item">
+              <div class="color-box" style="background-color: ${FAMILY_COLORS[family]};"></div>
+              <span>${family}</span>
+            </div>
+          `;
+        });
+        
+        legendContent.innerHTML = html;
+      } else {
+        // Default mode - no legend needed
+        legendContent.innerHTML = '';
+      }
+    }
+
+    // ============================================================================
+    // TIMELINE FUNCTIONS
+    // ============================================================================
+    function buildTimelineSteps() {
+      // Extract unique years from data
+      const yearsSet = new Set(state.geojsonFeatures.map(f => f.properties.year));
+      state.allYears = Array.from(yearsSet).sort((a, b) => a - b);
+      
+      // Create timeline steps: each year has 4 seasons
+      const seasons = ['Spring', 'Summer', 'Fall', 'Winter'];
+      state.timelineSteps = [];
+      
+      state.allYears.forEach(year => {
+        seasons.forEach(season => {
+          state.timelineSteps.push({ year, season });
+        });
+      });
+      
+      // Update slider max value
+      const slider = document.getElementById('timelineSlider');
+      slider.max = state.timelineSteps.length - 1;
+      
+      // Find the index for Spring 2000
+      const spring2000Index = state.timelineSteps.findIndex(
+        step => step.year === 2000 && step.season === 'Spring'
+      );
+      
+      // Set initial position to Spring 2000, or 0 if not found
+      state.currentTimelineIndex = spring2000Index !== -1 ? spring2000Index : 0;
+      slider.value = state.currentTimelineIndex;
+      
+      // Set initial timeline position
+      updateTimelineDisplay();
+    }
+    
+    function updateTimelineDisplay() {
+      if (state.timelineSteps.length === 0) return;
+      
+      const currentStep = state.timelineSteps[state.currentTimelineIndex];
+      document.getElementById('currentYear').textContent = currentStep.year;
+      document.getElementById('currentSeason').textContent = currentStep.season;
+      
+      // Update slider position
+      document.getElementById('timelineSlider').value = state.currentTimelineIndex;
+      
+      // Update prev/next button states
+      document.getElementById('prevBtn').disabled = state.currentTimelineIndex === 0;
+      document.getElementById('nextBtn').disabled = state.currentTimelineIndex === state.timelineSteps.length - 1;
+      
+      // Filter data based on current timeline
+      applyTimelineFilter();
+    }
+    
+    function applyTimelineFilter() {
+      if (state.timelineSteps.length === 0) return;
+      
+      const currentStep = state.timelineSteps[state.currentTimelineIndex];
+      
+      state.filteredFeatures = state.geojsonFeatures.filter(feature => {
+        const matchesTimeline = feature.properties.year === currentStep.year && 
+                                feature.properties.Season === currentStep.season;
+        
+        // Apply family and genus filters
+        const matchesFamily = state.selectedFamilies.size === 0 || 
+                             state.selectedFamilies.has(feature.properties.Family);
+        const matchesGenus = state.selectedGenus.size === 0 || 
+                            state.selectedGenus.has(feature.properties.Genus);
+        
+        return matchesTimeline && matchesFamily && matchesGenus;
+      });
+      
+      state.filteredPoints = state.pointsData.filter(point => {
+        const matchesTimeline = point.year === currentStep.year && 
+                               point.Season === currentStep.season;
+        
+        // Apply family and genus filters
+        const matchesFamily = state.selectedFamilies.size === 0 || 
+                             state.selectedFamilies.has(point.Family);
+        const matchesGenus = state.selectedGenus.size === 0 || 
+                            state.selectedGenus.has(point.Genus);
+        
+        return matchesTimeline && matchesFamily && matchesGenus;
+      });
+      
+      // Update display
+      if (state.currentDisplayMode === DISPLAY_MODE.HEX) {
+        switchToHexMode();
+      } else {
+        switchToPointsMode();
+      }
+    }
+    
+    function goToPreviousStep() {
+      if (state.currentTimelineIndex > 0) {
+        state.currentTimelineIndex--;
+        updateTimelineDisplay();
+      }
+    }
+    
+    function goToNextStep() {
+      if (state.currentTimelineIndex < state.timelineSteps.length - 1) {
+        state.currentTimelineIndex++;
+        updateTimelineDisplay();
+      }
+    }
+    
+    function togglePlayPause() {
+      state.isPlaying = !state.isPlaying;
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      
+      if (state.isPlaying) {
+        playPauseBtn.textContent = '⏸ Pause';
+        state.playInterval = setInterval(() => {
+          if (state.currentTimelineIndex < state.timelineSteps.length - 1) {
+            goToNextStep();
+          } else {
+            // Loop back to start
+            state.currentTimelineIndex = 0;
+            updateTimelineDisplay();
+          }
+        }, 500); // Change every half second (2x faster)
+      } else {
+        playPauseBtn.textContent = '▶ Play';
+        if (state.playInterval) {
+          clearInterval(state.playInterval);
+          state.playInterval = null;
+        }
+      }
+    }
+    
+    function handleSliderChange(event) {
+      state.currentTimelineIndex = parseInt(event.target.value);
+      updateTimelineDisplay();
+      
+      // Pause if playing
+      if (state.isPlaying) {
+        togglePlayPause();
       }
     }
 
     function createFilterUI() {
-      // Season checkboxes
-      const seasonCheckboxes = document.getElementById('seasonCheckboxes');
-      const seasons = ['Spring', 'Summer', 'Fall', 'Winter'];
-      seasonCheckboxes.innerHTML = seasons.map(season => `
-        <label class="checkbox-item">
-          <input type="checkbox" value="${season}" ${state.selectedSeasons.has(season) ? 'checked' : ''}>
-          ${season}
-        </label>
-      `).join('');
-      
-      // Family checkboxes
       updateFamilyCheckboxes();
-      
-      // Genus checkboxes
       updateGenusCheckboxes();
+      
+      // Add search listeners
+      document.getElementById('familySearch').addEventListener('input', (e) => {
+        updateFamilyCheckboxes(e.target.value);
+      });
+      
+      document.getElementById('speciesSearch').addEventListener('input', (e) => {
+        updateGenusCheckboxes(e.target.value);
+      });
     }
     
     function updateFamilyCheckboxes(searchTerm = '') {
-      const familyCheckboxes = document.getElementById('familyCheckboxes');
-      const filteredFamilies = Array.from(state.allFamilies).filter(family => 
-        family.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      familyCheckboxes.innerHTML = filteredFamilies.map(family => `
+      const container = document.getElementById('familyCheckboxes');
+      const families = Array.from(state.allFamilies).sort();
+      const filteredFamilies = searchTerm 
+        ? families.filter(f => f.toLowerCase().includes(searchTerm.toLowerCase()))
+        : families;
+      
+      // Determine if a family should be checked
+      // If selectedFamilies is empty, all should be checked (no filter active)
+      // Otherwise, only selected ones should be checked
+      const shouldBeChecked = (family) => {
+        if (state.selectedFamilies.size === 0) {
+          return true; // No filter active, all checked
+        }
+        return state.selectedFamilies.has(family);
+      };
+      
+      container.innerHTML = filteredFamilies.map(family => `
         <label class="checkbox-item">
-          <input type="checkbox" value="${family}" ${state.selectedFamilies.has(family) ? 'checked' : ''}>
+          <input type="checkbox" value="${family}" 
+                 ${shouldBeChecked(family) ? 'checked' : ''}>
           ${family}
         </label>
       `).join('');
+      
+      // Add event listeners
+      container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', handleFamilyFilterChange);
+      });
     }
     
     function updateGenusCheckboxes(searchTerm = '') {
-      const genusCheckboxes = document.getElementById('genusCheckboxes');
-      const filteredGenus = Array.from(state.allGenus).filter(genus => 
-        genus.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      genusCheckboxes.innerHTML = filteredGenus.map(genus => `
+      const container = document.getElementById('genusCheckboxes');
+      const genuses = Array.from(state.allGenus).sort();
+      const filteredGenuses = searchTerm 
+        ? genuses.filter(g => g.toLowerCase().includes(searchTerm.toLowerCase()))
+        : genuses;
+      
+      // Determine if a genus should be checked
+      const shouldBeChecked = (genus) => {
+        if (state.selectedGenus.size === 0) {
+          return true; // No filter active, all checked
+        }
+        return state.selectedGenus.has(genus);
+      };
+      
+      container.innerHTML = filteredGenuses.map(genus => `
         <label class="checkbox-item">
-          <input type="checkbox" value="${genus}" ${state.selectedGenus.has(genus) ? 'checked' : ''}>
+          <input type="checkbox" value="${genus}" 
+                 ${shouldBeChecked(genus) ? 'checked' : ''}>
           ${genus}
         </label>
       `).join('');
+      
+      // Add event listeners
+      container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', handleGenusFilterChange);
+      });
+    }
+    
+    function handleFamilyFilterChange(event) {
+      const changedFamily = event.target.value;
+      const isChecked = event.target.checked;
+      const container = document.getElementById('familyCheckboxes');
+      const allCheckboxes = container.querySelectorAll('input[type="checkbox"]');
+      const checkedCheckboxes = Array.from(allCheckboxes).filter(cb => cb.checked);
+      
+      // Clear and rebuild the selected set based on what's checked
+      state.selectedFamilies.clear();
+      checkedCheckboxes.forEach(cb => {
+        state.selectedFamilies.add(cb.value);
+      });
+      
+      // If all are checked, clear the set (means show all)
+      if (checkedCheckboxes.length === allCheckboxes.length) {
+        state.selectedFamilies.clear();
+      }
+      
+      // CASCADE: If a family was unchecked, uncheck all its genus children
+      if (!isChecked) {
+        // Find all genus that belong to this family
+        const genusInFamily = Array.from(state.genusToFamily.entries())
+          .filter(([genus, family]) => family === changedFamily)
+          .map(([genus, family]) => genus);
+        
+        // Remove these genus from selected set
+        genusInFamily.forEach(genus => {
+          state.selectedGenus.delete(genus);
+        });
+        
+        // Update genus checkboxes to reflect the change
+        const genusContainer = document.getElementById('genusCheckboxes');
+        genusContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+          if (genusInFamily.includes(checkbox.value)) {
+            checkbox.checked = false;
+          }
+        });
+      }
+      
+      applyTimelineFilter();
+    }
+    
+    function handleGenusFilterChange(event) {
+      const genus = event.target.value;
+      const container = document.getElementById('genusCheckboxes');
+      const allCheckboxes = container.querySelectorAll('input[type="checkbox"]');
+      const checkedCheckboxes = Array.from(allCheckboxes).filter(cb => cb.checked);
+      
+      // Clear and rebuild the selected set based on what's checked
+      state.selectedGenus.clear();
+      checkedCheckboxes.forEach(cb => {
+        state.selectedGenus.add(cb.value);
+      });
+      
+      // If all are checked, clear the set (means show all)
+      if (checkedCheckboxes.length === allCheckboxes.length) {
+        state.selectedGenus.clear();
+      }
+      
+      applyTimelineFilter();
     }
 
     // ============================================================================
@@ -396,7 +773,8 @@
         });
         
         state.cloudsMesh = new THREE.Mesh(cloudsGeometry, cloudsMaterial);
-        globe.scene().add(state.cloudsMesh);
+        // Clouds are toggled off by default - don't add to scene initially
+        // globe.scene().add(state.cloudsMesh);
         
         animateClouds();
       });
@@ -435,86 +813,42 @@
           // Populate all families and genus
           state.allFamilies = new Set(allFeatures.map(f => f.properties.Family));
           state.allGenus = new Set(allFeatures.map(f => f.properties.Genus));
-          state.selectedFamilies = new Set(state.allFamilies);
-          state.selectedGenus = new Set(state.allGenus);
           
-          // Initial filter
-          applyFilters();
+          // Build genus to family mapping
+          state.genusToFamily.clear();
+          allFeatures.forEach(f => {
+            state.genusToFamily.set(f.properties.Genus, f.properties.Family);
+          });
           
+          // Initialize family colors
+          initializeFamilyColors();
+          
+          // Build timeline
+          buildTimelineSteps();
+          
+          // Create filter UI
           createFilterUI();
+          
           updateLegend();
+          switchToPointsMode();
         })
         .catch(error => {
           console.error('Error loading GeoJSON data:', error);
+          alert('Error loading data: ' + error.message);
         });
     }
 
     // ============================================================================
-    // FILTERING FUNCTIONS
+    // FILTERING FUNCTIONS (Legacy - now handled by timeline)
     // ============================================================================
     function applyFilters() {
-      state.filteredFeatures = state.geojsonFeatures.filter(feature => {
-        const season = feature.properties.Season;
-        const family = feature.properties.Family;
-        const genus = feature.properties.Genus;
-        return state.selectedSeasons.has(season) && state.selectedFamilies.has(family) && state.selectedGenus.has(genus);
-      });
-      state.filteredPoints = state.pointsData.filter(point => {
-        const season = point.Season;
-        const family = point.Family;
-        const genus = point.Genus;
-        return state.selectedSeasons.has(season) && state.selectedFamilies.has(family) && state.selectedGenus.has(genus);
-      });
-      
-      // Update display
-      if (state.currentDisplayMode === DISPLAY_MODE.HEX) {
-        switchToHexMode();
-      } else {
-        switchToPointsMode();
-      }
+      // Now handled by applyTimelineFilter
+      applyTimelineFilter();
     }
 
     // ============================================================================
     // EVENT HANDLERS
     // ============================================================================
-    function handleSeasonCheckboxChange(event) {
-      const season = event.target.value;
-      if (event.target.checked) {
-        state.selectedSeasons.add(season);
-      } else {
-        state.selectedSeasons.delete(season);
-      }
-      applyFilters();
-    }
-    
-    function handleFamilyCheckboxChange(event) {
-      const family = event.target.value;
-      if (event.target.checked) {
-        state.selectedFamilies.add(family);
-      } else {
-        state.selectedFamilies.delete(family);
-      }
-      applyFilters();
-    }
-    
-    function handleGenusCheckboxChange(event) {
-      const genus = event.target.value;
-      if (event.target.checked) {
-        state.selectedGenus.add(genus);
-      } else {
-        state.selectedGenus.delete(genus);
-      }
-      applyFilters();
-    }
-    
-    function handleFamilySearch(event) {
-      updateFamilyCheckboxes(event.target.value);
-    }
-    
-    function handleGenusSearch(event) {
-      updateGenusCheckboxes(event.target.value);
-    }
-    
     function handleToggleModeClick() {
       if (state.currentDisplayMode === DISPLAY_MODE.HEX) {
         state.currentDisplayMode = DISPLAY_MODE.POINTS;
@@ -533,6 +867,23 @@
         refreshGlobeColors();
       }
     }
+    
+    function handleToggleColorClick() {
+      // Toggle between default and family color modes
+      if (state.currentColorMode === COLOR_MODE.DEFAULT) {
+        state.currentColorMode = COLOR_MODE.FAMILY;
+        document.getElementById('toggleColorBtn').textContent = 'Single Color';
+      } else {
+        state.currentColorMode = COLOR_MODE.DEFAULT;
+        document.getElementById('toggleColorBtn').textContent = 'Color by Family';
+      }
+      
+      // Update legend
+      updateLegend();
+      
+      // Refresh globe colors
+      refreshGlobeColors();
+    }
 
     // ============================================================================
     // EVENT LISTENERS
@@ -540,13 +891,13 @@
     document.getElementById('toggleCloudsBtn').addEventListener('click', toggleCloudsVisibility);
     document.getElementById('toggleRingsBtn').addEventListener('click', handleToggleRingsClick);
     document.getElementById('toggleModeBtn').addEventListener('click', handleToggleModeClick);
+    document.getElementById('toggleColorBtn').addEventListener('click', handleToggleColorClick);
     
-    // Filter listeners
-    document.getElementById('seasonCheckboxes').addEventListener('change', handleSeasonCheckboxChange);
-    document.getElementById('familyCheckboxes').addEventListener('change', handleFamilyCheckboxChange);
-    document.getElementById('genusCheckboxes').addEventListener('change', handleGenusCheckboxChange);
-    document.getElementById('familySearch').addEventListener('input', handleFamilySearch);
-    document.getElementById('genusSearch').addEventListener('input', handleGenusSearch);
+    // Timeline listeners
+    document.getElementById('prevBtn').addEventListener('click', goToPreviousStep);
+    document.getElementById('nextBtn').addEventListener('click', goToNextStep);
+    document.getElementById('playPauseBtn').addEventListener('click', togglePlayPause);
+    document.getElementById('timelineSlider').addEventListener('input', handleSliderChange);
 
     // ============================================================================
     // INITIALIZATION
