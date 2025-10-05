@@ -14,6 +14,24 @@ import json
 from google.oauth2 import service_account
 import threading
 
+# Import bloom feature calculation functions
+try:
+    # Try relative import first (when used as module)
+    from .bloom_features import (
+        calculate_spring_start_date,
+        calculate_accumulated_gdd,
+        calculate_soil_water_days,
+        calculate_comprehensive_bloom_features
+    )
+except ImportError:
+    # Fall back to absolute import (when run directly)
+    from bloom_features import (
+        calculate_spring_start_date,
+        calculate_accumulated_gdd,
+        calculate_soil_water_days,
+        calculate_comprehensive_bloom_features
+    )
+
 class ImprovedBloomPredictor:
     """
     Improved bloom predictor that learns actual bloom dynamics using:
@@ -287,13 +305,25 @@ class ImprovedBloomPredictor:
         """
         Get environmental data from Earth Engine with temporal aggregation
         Returns averages/trends over the period leading up to the date
+        Now includes advanced features for bloom prediction
         """
         try:
+            # Import here to avoid circular imports
+            try:
+                from .earth_engine_utils import get_comprehensive_environmental_data
+            except ImportError:
+                from earth_engine_utils import get_comprehensive_environmental_data
+            
             point = ee.Geometry.Point([lon, lat])
             end_date = ee.Date(date.strftime('%Y-%m-%d'))
             start_date = end_date.advance(-days_before, 'day')
             
-            # Temperature (MODIS LST)
+            # Get comprehensive environmental data including time series
+            comprehensive_data = get_comprehensive_environmental_data(
+                lat, lon, date, lookback_days=90
+            )
+            
+            # Temperature (MODIS LST) - for current conditions
             lst = ee.ImageCollection('MODIS/061/MOD11A1') \
                 .filterDate(start_date, end_date) \
                 .select('LST_Day_1km')
@@ -309,7 +339,7 @@ class ImprovedBloomPredictor:
             precip_total = precip.sum().select('precipitation')
             precip_mean = precip.mean().select('precipitation')
             
-            # NDVI (MODIS)
+            # NDVI (MODIS) - current conditions
             ndvi = ee.ImageCollection('MODIS/061/MOD13Q1') \
                 .filterDate(start_date, end_date) \
                 .select('NDVI')
@@ -340,7 +370,16 @@ class ImprovedBloomPredictor:
                 'ndvi_mean': self._safe_extract(ndvi_mean, point, scale, 'NDVI'),
                 'ndvi_max': self._safe_extract(ndvi_max, point, scale, 'NDVI'),
                 'ndvi_trend': self._safe_extract(ndvi_trend, point, scale, 'scale'),
-                'elevation': self._safe_extract(elevation, point, scale, 'elevation')
+                'elevation': self._safe_extract(elevation, point, scale, 'elevation'),
+                
+                # Add comprehensive data from time series
+                'ndvi_time_series': comprehensive_data.get('ndvi_time_series', []),
+                'ndvi_dates': comprehensive_data.get('ndvi_dates', []),
+                'tmax_series': comprehensive_data.get('tmax_series', []),
+                'tmin_series': comprehensive_data.get('tmin_series', []),
+                'temp_dates': comprehensive_data.get('temp_dates', []),
+                'soil_moisture': comprehensive_data.get('soil_moisture', 20),
+                'field_capacity': comprehensive_data.get('field_capacity', 25),
             }
             
             # Convert temperature from Kelvin to Celsius and scale
@@ -375,7 +414,8 @@ class ImprovedBloomPredictor:
             return 0.0
     
     def get_environmental_data_fallback(self, lat, lon, date):
-        """Fallback environmental data using climate normals with spatial variation"""
+        """Fallback environmental data using climate normals with spatial variation
+        Now includes time series data for advanced feature calculation"""
         day_of_year = date.timetuple().tm_yday
         month = date.month
         
@@ -419,6 +459,31 @@ class ImprovedBloomPredictor:
         # Elevation (rough estimate with variation)
         elevation = max(0, 100 + abs(lat - 40) * 30 + np.sin(lon * 5) * 50)
         
+        # Generate synthetic time series for 90 days
+        lookback_days = 90
+        dates_series = [(date - timedelta(days=i)) for i in range(lookback_days, 0, -1)]
+        
+        ndvi_series = []
+        tmax_series = []
+        tmin_series = []
+        
+        for d in dates_series:
+            d_day_of_year = d.timetuple().tm_yday
+            # NDVI varies seasonally
+            ndvi_val = 0.35 + 0.35 * np.sin(2 * np.pi * (d_day_of_year - 80) / 365) + ndvi_spatial
+            ndvi_series.append(max(0, min(1, ndvi_val)))
+            
+            # Temperature varies seasonally
+            seasonal_t = 12 * np.sin(2 * np.pi * (d_day_of_year - 80) / 365)
+            t_mean = base_temp + seasonal_t + lat_variation
+            tmax_series.append(t_mean + 5 + abs(lon_variation))
+            tmin_series.append(t_mean - 5 - abs(lon_variation))
+        
+        # Soil moisture estimate (varies with precipitation and season)
+        soil_moisture = 15 + precip_total / 5
+        # Field capacity varies by approximate soil type (inferred from location)
+        field_capacity = 20 + abs(np.sin(lat * lon)) * 10  # 20-30% range
+        
         return {
             'temp_mean': temp_mean,
             'temp_max': temp_max,
@@ -428,7 +493,16 @@ class ImprovedBloomPredictor:
             'ndvi_mean': max(0, min(1, ndvi_mean)),
             'ndvi_max': max(0, min(1, ndvi_max)),
             'ndvi_trend': ndvi_trend,
-            'elevation': elevation
+            'elevation': elevation,
+            
+            # Time series data
+            'ndvi_time_series': ndvi_series,
+            'ndvi_dates': [d.strftime('%Y-%m-%d') for d in dates_series],
+            'tmax_series': tmax_series,
+            'tmin_series': tmin_series,
+            'temp_dates': [d.strftime('%Y-%m-%d') for d in dates_series],
+            'soil_moisture': soil_moisture,
+            'field_capacity': field_capacity,
         }
     
     def get_environmental_data(self, lat, lon, date):
@@ -447,7 +521,7 @@ class ImprovedBloomPredictor:
         return data
     
     def build_temporal_features(self):
-        """Build comprehensive feature set for bloom prediction"""
+        """Build comprehensive feature set for bloom prediction with advanced ecological features"""
         # Combine positive and negative examples
         all_data = pd.concat([
             self.historical_blooms[['date', 'lat', 'lon', 'scientificName', 
@@ -466,7 +540,7 @@ class ImprovedBloomPredictor:
             if idx % 100 == 0:
                 print(f"  Processing {idx}/{len(all_data)}...")
             
-            # Get environmental data
+            # Get environmental data (now includes time series)
             env_data = self.get_environmental_data(row['lat'], row['lon'], row['date'])
             
             # Get species bloom window info
@@ -481,7 +555,17 @@ class ImprovedBloomPredictor:
             day_sin = np.sin(2 * np.pi * row['day_of_year'] / 365)
             day_cos = np.cos(2 * np.pi * row['day_of_year'] / 365)
             
-            # Build feature vector
+            # Calculate advanced bloom features using the new module
+            advanced_features = calculate_comprehensive_bloom_features({
+                'ndvi_time_series': env_data.get('ndvi_time_series', []),
+                'dates': pd.to_datetime(env_data.get('ndvi_dates', [])) if env_data.get('ndvi_dates') else [],
+                'tmax': env_data.get('tmax_series', [env_data['temp_max']]),
+                'tmin': env_data.get('tmin_series', [env_data['temp_min']]),
+                'soil_moisture': env_data.get('soil_moisture', 20),
+                'field_capacity': env_data.get('field_capacity', 25)
+            })
+            
+            # Build comprehensive feature vector
             features = {
                 # Spatial
                 'lat': row['lat'],
@@ -507,10 +591,27 @@ class ImprovedBloomPredictor:
                 'ndvi_trend': env_data['ndvi_trend'],
                 'elevation': env_data['elevation'],
                 
-                # Derived features
-                'growing_degree_days': max(0, env_data['temp_mean'] - 10) * 30,  # Approximation
+                # Derived features (original)
+                'growing_degree_days': max(0, env_data['temp_mean'] - 10) * 30,  # Legacy
                 'moisture_index': env_data['precip_total'] / (env_data['temp_mean'] + 20),
                 'vegetation_health': env_data['ndvi_mean'] * (1 + env_data['ndvi_trend']),
+                
+                # NEW ADVANCED FEATURES
+                # 1. Spring phenology features
+                'spring_start_day': advanced_features.get('spring_start_day', 80),
+                'days_since_spring_start': advanced_features.get('days_since_spring_start', 0),
+                'is_spring_active': int(advanced_features.get('is_spring_active', False)),
+                'winter_ndvi_baseline': advanced_features.get('winter_ndvi_baseline', 0.2),
+                
+                # 2. Growing Degree Days (Baskerville-Emin method)
+                'gdd_current': advanced_features.get('gdd_current', 0),
+                'gdd_accumulated_30d': advanced_features.get('gdd_accumulated_30d', 0),
+                
+                # 3. Soil water availability
+                'soil_water_days': advanced_features.get('soil_water_days', 0),
+                'wilting_point': advanced_features.get('wilting_point', 10),
+                'water_stress': int(advanced_features.get('water_stress', False)),
+                'available_water_ratio': advanced_features.get('available_water_ratio', 0.5),
                 
                 # Species encoding (one-hot would be better, but keeping simple)
                 'species': row['scientificName'],
@@ -524,17 +625,35 @@ class ImprovedBloomPredictor:
         self.feature_data = pd.DataFrame(features_list)
         
         # Define features for model (excluding target and non-numeric)
+        # Updated to include all new advanced features
         self.feature_columns = [
+            # Original features
             'lat', 'lon', 'day_of_year', 'month', 'week_of_year',
             'day_sin', 'day_cos', 'days_from_species_mean',
             'temp_mean', 'temp_max', 'temp_min', 'temp_range',
             'precip_total', 'precip_mean',
             'ndvi_mean', 'ndvi_max', 'ndvi_trend',
             'elevation', 'growing_degree_days', 'moisture_index',
-            'vegetation_health'
+            'vegetation_health',
+            
+            # NEW ADVANCED FEATURES
+            # Spring phenology
+            'spring_start_day', 'days_since_spring_start', 'is_spring_active',
+            'winter_ndvi_baseline',
+            
+            # Growing Degree Days
+            'gdd_current', 'gdd_accumulated_30d',
+            
+            # Soil water
+            'soil_water_days', 'wilting_point', 'water_stress',
+            'available_water_ratio'
         ]
         
         print(f"✓ Built {len(self.feature_columns)} features for {len(self.feature_data)} observations")
+        print(f"  - Original features: 21")
+        print(f"  - Advanced spring features: 4")
+        print(f"  - GDD features: 2")
+        print(f"  - Soil water features: 4")
         print(f"  Class distribution: Bloom={sum(self.feature_data['bloom'])}, "
               f"No-bloom={sum(self.feature_data['bloom']==0)}")
     
@@ -604,6 +723,7 @@ class ImprovedBloomPredictor:
         """
         Predict bloom probability for a specific location, date, and species
         Returns probability between 0 and 1
+        Now uses advanced bloom features
         """
         if self.model is None or self.is_training:
             return 0.0
@@ -612,7 +732,7 @@ class ImprovedBloomPredictor:
         if species is None:
             species = self.historical_blooms['scientificName'].mode()[0]
         
-        # Get environmental data
+        # Get environmental data (now includes time series)
         env_data = self.get_environmental_data(lat, lon, date)
         
         # Get species info
@@ -627,8 +747,19 @@ class ImprovedBloomPredictor:
         day_sin = np.sin(2 * np.pi * day_of_year / 365)
         day_cos = np.cos(2 * np.pi * day_of_year / 365)
         
-        # Build feature vector
+        # Calculate advanced bloom features
+        advanced_features = calculate_comprehensive_bloom_features({
+            'ndvi_time_series': env_data.get('ndvi_time_series', []),
+            'dates': pd.to_datetime(env_data.get('ndvi_dates', [])) if env_data.get('ndvi_dates') else [],
+            'tmax': env_data.get('tmax_series', [env_data['temp_max']]),
+            'tmin': env_data.get('tmin_series', [env_data['temp_min']]),
+            'soil_moisture': env_data.get('soil_moisture', 20),
+            'field_capacity': env_data.get('field_capacity', 25)
+        })
+        
+        # Build comprehensive feature vector matching training features
         features = np.array([[
+            # Original features
             lat, lon, day_of_year, date.month, date.isocalendar()[1],
             day_sin, day_cos, days_from_mean,
             env_data['temp_mean'], env_data['temp_max'], env_data['temp_min'],
@@ -636,9 +767,26 @@ class ImprovedBloomPredictor:
             env_data['precip_total'], env_data['precip_mean'],
             env_data['ndvi_mean'], env_data['ndvi_max'], env_data['ndvi_trend'],
             env_data['elevation'],
-            max(0, env_data['temp_mean'] - 10) * 30,
+            max(0, env_data['temp_mean'] - 10) * 30,  # Legacy GDD
             env_data['precip_total'] / (env_data['temp_mean'] + 20),
-            env_data['ndvi_mean'] * (1 + env_data['ndvi_trend'])
+            env_data['ndvi_mean'] * (1 + env_data['ndvi_trend']),
+            
+            # NEW ADVANCED FEATURES
+            # Spring phenology
+            advanced_features.get('spring_start_day', 80),
+            advanced_features.get('days_since_spring_start', 0),
+            int(advanced_features.get('is_spring_active', False)),
+            advanced_features.get('winter_ndvi_baseline', 0.2),
+            
+            # Growing Degree Days
+            advanced_features.get('gdd_current', 0),
+            advanced_features.get('gdd_accumulated_30d', 0),
+            
+            # Soil water
+            advanced_features.get('soil_water_days', 0),
+            advanced_features.get('wilting_point', 10),
+            int(advanced_features.get('water_stress', False)),
+            advanced_features.get('available_water_ratio', 0.5)
         ]])
         
         # Scale features

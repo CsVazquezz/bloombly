@@ -8,9 +8,14 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-import config
-from routes.data import data_bp
-from routes.predict import predict_bp
+try:
+    from . import config
+    from .routes.data import data_bp
+    from .routes.predict import predict_bp
+except ImportError:
+    import config
+    from routes.data import data_bp
+    from routes.predict import predict_bp
 
 # Try to import Earth Engine, but make it optional
 try:

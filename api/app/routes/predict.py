@@ -1,10 +1,16 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 import logging
-from bloom_predictor import EnhancedBloomPredictor
-from bloom_predictor_v2 import ImprovedBloomPredictor
-import config
-from models.schemas import BloomsPredictionQuery, EnvironmentalDataQuery
+try:
+    from ..bloom_predictor import EnhancedBloomPredictor
+    from ..bloom_predictor_v2 import ImprovedBloomPredictor
+    from .. import config
+    from ..models.schemas import BloomsPredictionQuery, EnvironmentalDataQuery
+except ImportError:
+    from bloom_predictor import EnhancedBloomPredictor
+    from bloom_predictor_v2 import ImprovedBloomPredictor
+    import config
+    from models.schemas import BloomsPredictionQuery, EnvironmentalDataQuery
 from pydantic import ValidationError
 
 predict_bp = Blueprint('predict', __name__)

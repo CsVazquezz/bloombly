@@ -1,0 +1,35 @@
+quiero agregar una serie de caracterírsticas para poder mejorar el modelo de predicción de los blooms:
+    1. Fecha de inicio de la primavera: se usa el promedio movil retardado, para lo cual:
+        a. se suavizan los datos del nvdi cada 5 dias (se crea un promedio movil de 5 dias, para eliminar la inconcistencia)
+        Por ejemplo, para el 2 de enero, es el promedio del 28, 29, 30, 31 de diciembre y el 1 de enero.
+        Esto hace una curva mas limpia y estable que muestra la tendencia real de crecimiento.
+
+        b. calcular el promedio del nvdi en invierno (1 de diciembre a 1 de marzo).
+
+        c. la primavera comienza cuando el NVDI suavizado supera el promedio invernal y se mantiene arriba con el aumento sostenido
+        mas largo del año.
+
+    2. calcular los grados al día de crecimiento (GDD) con el método BE (Basterville y Emin, 1969)
+        Mide la acumulación de calor ambiental sobre un umbral de temperatura base para el desarrollo de vegetación
+        La fórmula es:
+            GDD=[(Tmax+Tmin)/2]-Tbase
+            para este caso Tbase=0
+        Importante: mas grados por dia es más crecimiento potencial
+    
+    3. calcular los dias de agua disponible en el suelo
+        Soil Water day=0 if soil_water_content<base
+        soil water day=soil_water_content-base, if soil_water_content>base
+
+        Para calcular la base es:
+            Metodo del punto de marchitez permanente(PMP)
+            Es el contenido de agua en el suelo donde las plantas ya no pueden extraer agua y se marchitan permanentemente
+            La formuala es:
+                HP%PMP=HP%CC*0.74-5
+
+            HP(en porcentaje %) es e contenido de agua en el peso del suelo
+            CC(en porcentaje %) es la capacidad del campo para almacenar el agua
+        
+        El punto de marchitez varia entre especies de plantas. Las hojas de aguja, como los cactus estan protefidas de forma natural
+        de la evaporacion del agua.
+
+        Capacidad del campo (CC)=peso_fresco(con humedad) - peso_seco_del_suelo

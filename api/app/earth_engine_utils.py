@@ -187,3 +187,278 @@ def feature_collection_to_geojson(fc):
             "features": [],
             "error": str(e)
         }
+
+
+def get_ndvi_time_series(lat, lon, start_date, end_date, scale=250):
+    """
+    Get NDVI time series for spring detection analysis.
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    start_date : str or datetime
+        Start date in 'YYYY-MM-DD' format
+    end_date : str or datetime
+        End date in 'YYYY-MM-DD' format
+    scale : int
+        Scale in meters (default 250m for MODIS NDVI)
+    
+    Returns:
+    --------
+    dict : {
+        'dates': list of date strings,
+        'ndvi': list of NDVI values,
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # Use MODIS NDVI (16-day composite)
+        ndvi_collection = ee.ImageCollection('MODIS/061/MOD13Q1') \
+            .filterDate(start_date, end_date) \
+            .select('NDVI')
+        
+        # Extract time series
+        def extract_ndvi(image):
+            value = image.reduceRegion(
+                reducer=ee.Reducer.first(),
+                geometry=point,
+                scale=scale
+            ).get('NDVI')
+            
+            return ee.Feature(None, {
+                'date': image.date().format('YYYY-MM-dd'),
+                'ndvi': ee.Number(value).divide(10000)  # Scale to 0-1
+            })
+        
+        time_series = ndvi_collection.map(extract_ndvi)
+        
+        # Get info
+        features = time_series.getInfo()['features']
+        
+        dates = [f['properties']['date'] for f in features]
+        ndvi_values = [f['properties']['ndvi'] if f['properties']['ndvi'] is not None else 0 
+                       for f in features]
+        
+        return {
+            'dates': dates,
+            'ndvi': ndvi_values,
+            'success': True
+        }
+    except Exception as e:
+        print(f"Error getting NDVI time series: {e}")
+        return {
+            'dates': [],
+            'ndvi': [],
+            'success': False
+        }
+
+
+def get_temperature_time_series(lat, lon, start_date, end_date, scale=1000):
+    """
+    Get daily temperature time series for GDD calculation.
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    start_date : str or datetime
+        Start date in 'YYYY-MM-DD' format
+    end_date : str or datetime
+        End date in 'YYYY-MM-DD' format
+    scale : int
+        Scale in meters (default 1000m for MODIS LST)
+    
+    Returns:
+    --------
+    dict : {
+        'dates': list of date strings,
+        'tmax': list of max temps in Celsius,
+        'tmin': list of min temps in Celsius,
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # MODIS Land Surface Temperature
+        lst_collection = ee.ImageCollection('MODIS/061/MOD11A1') \
+            .filterDate(start_date, end_date) \
+            .select(['LST_Day_1km', 'LST_Night_1km'])
+        
+        def extract_temps(image):
+            temps = image.reduceRegion(
+                reducer=ee.Reducer.first(),
+                geometry=point,
+                scale=scale
+            )
+            
+            # Convert from Kelvin to Celsius (MODIS LST is scaled by 0.02)
+            tmax = ee.Number(temps.get('LST_Day_1km')).multiply(0.02).subtract(273.15)
+            tmin = ee.Number(temps.get('LST_Night_1km')).multiply(0.02).subtract(273.15)
+            
+            return ee.Feature(None, {
+                'date': image.date().format('YYYY-MM-dd'),
+                'tmax': tmax,
+                'tmin': tmin
+            })
+        
+        time_series = lst_collection.map(extract_temps)
+        features = time_series.getInfo()['features']
+        
+        dates = [f['properties']['date'] for f in features]
+        tmax = [f['properties']['tmax'] if f['properties']['tmax'] is not None else 20 
+                for f in features]
+        tmin = [f['properties']['tmin'] if f['properties']['tmin'] is not None else 10 
+                for f in features]
+        
+        return {
+            'dates': dates,
+            'tmax': tmax,
+            'tmin': tmin,
+            'success': True
+        }
+    except Exception as e:
+        print(f"Error getting temperature time series: {e}")
+        return {
+            'dates': [],
+            'tmax': [],
+            'tmin': [],
+            'success': False
+        }
+
+
+def get_soil_moisture_data(lat, lon, date, days_before=30, scale=10000):
+    """
+    Get soil moisture data for soil water availability calculation.
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    date : str or datetime
+        Target date in 'YYYY-MM-DD' format
+    days_before : int
+        Number of days before the target date to average
+    scale : int
+        Scale in meters (default 10000m for SMAP)
+    
+    Returns:
+    --------
+    dict : {
+        'soil_moisture': float (volumetric water content),
+        'field_capacity': float (estimated),
+        'success': bool
+    }
+    """
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        end_date = ee.Date(date)
+        start_date = end_date.advance(-days_before, 'day')
+        
+        # NASA SMAP Soil Moisture
+        smap = ee.ImageCollection('NASA/SMAP/SPL4SMGP/007') \
+            .filterDate(start_date, end_date) \
+            .select('sm_surface')
+        
+        # Average over the period
+        soil_moisture_avg = smap.mean()
+        
+        result = soil_moisture_avg.reduceRegion(
+            reducer=ee.Reducer.first(),
+            geometry=point,
+            scale=scale
+        )
+        
+        sm_value = result.get('sm_surface')
+        
+        if sm_value is not None:
+            soil_moisture = float(ee.Number(sm_value).getInfo())
+            
+            # Estimate field capacity based on soil moisture range
+            # Typical field capacity is 1.5-2x the average soil moisture
+            field_capacity = soil_moisture * 1.7
+        else:
+            soil_moisture = 20  # Default
+            field_capacity = 25  # Default for loam
+        
+        return {
+            'soil_moisture': soil_moisture,
+            'field_capacity': field_capacity,
+            'success': sm_value is not None
+        }
+    except Exception as e:
+        print(f"Error getting soil moisture data: {e}")
+        # Return defaults based on typical loam soil
+        return {
+            'soil_moisture': 20,
+            'field_capacity': 25,
+            'success': False
+        }
+
+
+def get_comprehensive_environmental_data(lat, lon, date, lookback_days=90):
+    """
+    Get comprehensive environmental data for advanced bloom feature calculation.
+    
+    This function retrieves:
+    - NDVI time series (for spring detection)
+    - Temperature time series (for GDD calculation)
+    - Soil moisture data (for water availability)
+    - Current environmental conditions
+    
+    Parameters:
+    -----------
+    lat : float
+        Latitude
+    lon : float
+        Longitude
+    date : str or datetime
+        Target date
+    lookback_days : int
+        Days of historical data to retrieve (default 90 for seasonal analysis)
+    
+    Returns:
+    --------
+    dict : Comprehensive environmental data including time series
+    """
+    if isinstance(date, str):
+        target_date = datetime.strptime(date, '%Y-%m-%d')
+    else:
+        target_date = date
+    
+    start_date = target_date - timedelta(days=lookback_days)
+    
+    # Get time series data
+    ndvi_ts = get_ndvi_time_series(lat, lon, 
+                                   start_date.strftime('%Y-%m-%d'),
+                                   target_date.strftime('%Y-%m-%d'))
+    
+    temp_ts = get_temperature_time_series(lat, lon,
+                                          start_date.strftime('%Y-%m-%d'),
+                                          target_date.strftime('%Y-%m-%d'))
+    
+    soil_data = get_soil_moisture_data(lat, lon, target_date.strftime('%Y-%m-%d'))
+    
+    # Combine all data
+    result = {
+        'ndvi_time_series': ndvi_ts['ndvi'] if ndvi_ts['success'] else [],
+        'ndvi_dates': ndvi_ts['dates'] if ndvi_ts['success'] else [],
+        'tmax_series': temp_ts['tmax'] if temp_ts['success'] else [],
+        'tmin_series': temp_ts['tmin'] if temp_ts['success'] else [],
+        'temp_dates': temp_ts['dates'] if temp_ts['success'] else [],
+        'soil_moisture': soil_data['soil_moisture'],
+        'field_capacity': soil_data['field_capacity'],
+        'has_time_series': ndvi_ts['success'] and temp_ts['success'],
+        'has_soil_data': soil_data['success']
+    }
+    
+    return result
