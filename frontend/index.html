@@ -322,17 +322,19 @@
       <h4>Data Source</h4>
       <label>
         <select id="dataSourceSelect">
-          <option value="satellite">Satellite Data (Earth Engine)</option>
-          <option value="prediction">ML Predictions (v2)</option>
+          <option value="prediction" selected>ML Predictions (v2) - Recommended ⭐</option>
+          <option value="satellite">Satellite Data (Earth Engine) - Slow ⚠️</option>
         </select>
       </label>
-      <div id="predictionOptions" style="display:none; margin-top: 8px;">
-        <label>Confidence: 
+      <div id="predictionOptions" style="display:block; margin-top: 8px;">
+        <label>Confidence Threshold: 
           <input type="number" id="confidenceInput" min="0" max="1" step="0.1" value="0.3" style="width: 60px;">
+          <small style="color: #7f8c8d;">(0.0 - 1.0)</small>
         </label>
         <br>
         <label>Max Predictions: 
-          <input type="number" id="numPredictionsInput" min="50" max="500" step="50" value="200" style="width: 60px;">
+          <input type="number" id="numPredictionsInput" min="50" max="500" step="50" value="150" style="width: 60px;">
+          <small style="color: #7f8c8d;">(50-500)</small>
         </label>
       </div>
     </div>
@@ -340,15 +342,87 @@
       <h4>Area of Interest (AOI)</h4>
       <label>Type:
         <select id="aoiTypeSelect">
-          <option value="global">Global</option>
+          <option value="point">Point (Lat/Lon)</option>
+          <option value="state" selected>State</option>
           <option value="country">Country</option>
-          <option value="state">State</option>
+          <option value="global">Global</option>
         </select>
       </label>
-      <label>Country: <input type="text" id="aoiCountryInput" placeholder="e.g. United States, Mexico"></label>
-      <label>State: <input type="text" id="aoiStateInput" placeholder="e.g. Texas"></label>
-      <label>Date: <input type="date" id="dateInput" value="2024-09-15"></label>
-      <button id="applyAoiBtn">Apply AOI</button>
+      
+      <!-- Point coordinates (for point AOI) -->
+      <div id="pointCoordinates" style="display:none; margin-top: 8px;">
+        <label>Latitude: <input type="number" id="latInput" min="-90" max="90" step="0.01" placeholder="e.g. 20.5" style="width: 80px;"></label>
+        <label>Longitude: <input type="number" id="lonInput" min="-180" max="180" step="0.01" placeholder="e.g. -100.0" style="width: 80px;"></label>
+      </div>
+      
+      <!-- Country selection -->
+      <div id="countryOptions" style="display:none; margin-top: 8px;">
+        <label>Country:
+          <select id="aoiCountrySelect" style="width: 100%;">
+            <option value="">Select Country</option>
+            <option value="Mexico">Mexico</option>
+            <option value="United States">United States</option>
+          </select>
+        </label>
+      </div>
+      
+      <!-- State selection -->
+      <div id="stateOptions" style="display:block; margin-top: 8px;">
+        <label>Country:
+          <select id="stateCountrySelect" style="width: 100%;">
+            <option value="Mexico" selected>Mexico</option>
+            <option value="United States">United States</option>
+          </select>
+        </label>
+        <label>State:
+          <select id="aoiStateSelect" style="width: 100%;">
+            <!-- Mexican States -->
+            <optgroup label="Mexican States">
+              <option value="Aguascalientes">Aguascalientes</option>
+              <option value="Baja California">Baja California</option>
+              <option value="Baja California Sur">Baja California Sur</option>
+              <option value="Campeche">Campeche</option>
+              <option value="Chiapas">Chiapas</option>
+              <option value="Chihuahua">Chihuahua</option>
+              <option value="Coahuila">Coahuila</option>
+              <option value="Colima">Colima</option>
+              <option value="Durango">Durango</option>
+              <option value="Guanajuato">Guanajuato</option>
+              <option value="Guerrero">Guerrero</option>
+              <option value="Hidalgo">Hidalgo</option>
+              <option value="Jalisco">Jalisco</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Michoacan">Michoacán</option>
+              <option value="Morelos">Morelos</option>
+              <option value="Nayarit">Nayarit</option>
+              <option value="Nuevo Leon">Nuevo León</option>
+              <option value="Oaxaca">Oaxaca</option>
+              <option value="Puebla">Puebla</option>
+              <option value="Queretaro" selected>Querétaro</option>
+              <option value="Quintana Roo">Quintana Roo</option>
+              <option value="San Luis Potosi">San Luis Potosí</option>
+              <option value="Sinaloa">Sinaloa</option>
+              <option value="Sonora">Sonora</option>
+              <option value="Tabasco">Tabasco</option>
+              <option value="Tamaulipas">Tamaulipas</option>
+              <option value="Tlaxcala">Tlaxcala</option>
+              <option value="Veracruz">Veracruz</option>
+              <option value="Yucatan">Yucatán</option>
+              <option value="Zacatecas">Zacatecas</option>
+            </optgroup>
+            <!-- US States (popular ones) -->
+            <optgroup label="US States">
+              <option value="California">California</option>
+              <option value="Texas">Texas</option>
+              <option value="Florida">Florida</option>
+              <option value="New York">New York</option>
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      
+      <label>Date: <input type="date" id="dateInput" value="2025-10-05"></label>
+      <button id="applyAoiBtn" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 8px;">🌸 Fetch Bloom Data</button>
     </div>
     
     <div id="filters">
@@ -1044,9 +1118,15 @@
     // DATA LOADING
     // ============================================================================
     function loadGeoJSONData() {
-      // Fetch bloom data from API (default to satellite data)
-      fetch(`${API_BASE_URL}/data/blooms?aoi_type=global&date=2024-09-15`)
-        .then(response => response.json())
+      // Fetch bloom predictions from API using the v2 model (faster and more reliable than satellite data)
+      // Using Querétaro as default since it's been tested and works well
+      fetch(`${API_BASE_URL}/predict/blooms?aoi_type=state&aoi_state=Queretaro&date=2025-10-05&method=v2&num_predictions=150`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
         .then(data => {
           const allFeatures = data.features.filter(feature => 
             feature.properties.Family && feature.properties.Genus && feature.properties.Season
@@ -1197,27 +1277,58 @@
       predictionOptions.style.display = e.target.value === 'prediction' ? 'block' : 'none';
     });
     
+    // AOI Type selection - show/hide relevant options
+    document.getElementById('aoiTypeSelect').addEventListener('change', function(e) {
+      const aoiType = e.target.value;
+      document.getElementById('pointCoordinates').style.display = aoiType === 'point' ? 'block' : 'none';
+      document.getElementById('countryOptions').style.display = aoiType === 'country' ? 'block' : 'none';
+      document.getElementById('stateOptions').style.display = aoiType === 'state' ? 'block' : 'none';
+    });
+    
     // Filter listeners
     document.getElementById('seasonCheckboxes').addEventListener('change', handleSeasonCheckboxChange);
     document.getElementById('applyAoiBtn').addEventListener('click', function() {
       const aoiType = document.getElementById('aoiTypeSelect').value;
-      const aoiCountry = document.getElementById('aoiCountryInput').value.trim();
-      const aoiState = document.getElementById('aoiStateInput').value.trim();
       const date = document.getElementById('dateInput').value;
       const dataSource = document.getElementById('dataSourceSelect').value;
       const confidence = document.getElementById('confidenceInput').value;
       const numPredictions = document.getElementById('numPredictionsInput').value;
 
-      console.log('AOI Button clicked:', { aoiType, aoiCountry, aoiState, date, dataSource });
+      console.log('AOI Button clicked:', { aoiType, date, dataSource });
 
-      // Build query string
+      // Build query string based on AOI type
       const params = {
         aoi_type: aoiType,
         date: date
       };
       
-      if (aoiCountry) params.aoi_country = aoiCountry;
-      if (aoiState) params.aoi_state = aoiState;
+      // Add type-specific parameters
+      if (aoiType === 'point') {
+        const lat = document.getElementById('latInput').value;
+        const lon = document.getElementById('lonInput').value;
+        if (!lat || !lon) {
+          alert('Please enter latitude and longitude for point location');
+          return;
+        }
+        params.lat = lat;
+        params.lon = lon;
+      } else if (aoiType === 'state') {
+        const stateCountry = document.getElementById('stateCountrySelect').value;
+        const aoiState = document.getElementById('aoiStateSelect').value;
+        if (!aoiState) {
+          alert('Please select a state');
+          return;
+        }
+        params.aoi_country = stateCountry;
+        params.aoi_state = aoiState;
+      } else if (aoiType === 'country') {
+        const aoiCountry = document.getElementById('aoiCountrySelect').value;
+        if (!aoiCountry) {
+          alert('Please select a country');
+          return;
+        }
+        params.aoi_country = aoiCountry;
+      }
       
       // Add prediction-specific parameters
       if (dataSource === 'prediction') {
@@ -1233,9 +1344,18 @@
       const apiUrl = `${API_BASE_URL}/${endpoint}?${qs}`;
       console.log('Fetching from:', apiUrl);
 
+      // Show loading indicator
+      const btn = document.getElementById('applyAoiBtn');
+      const originalText = btn.textContent;
+      btn.textContent = '⏳ Loading...';
+      btn.disabled = true;
+
       fetch(apiUrl)
         .then(r => {
           console.log('API Response status:', r.status);
+          if (!r.ok) {
+            throw new Error(`API returned status ${r.status}`);
+          }
           return r.json();
         })
         .then(data => {
@@ -1249,6 +1369,11 @@
           });
 
           console.log('Filtered features count:', allFeatures.length);
+
+          if (allFeatures.length === 0) {
+            alert('No bloom data found for the selected area and date. Try a different location or date.');
+            return;
+          }
 
           state.geojsonFeatures = allFeatures;
           state.pointsData = allFeatures.map(createPointFromFeature);
@@ -1273,10 +1398,17 @@
           }
 
           console.log('Globe update complete');
+          alert(`✅ Loaded ${allFeatures.length} bloom predictions!`);
         })
         .catch(err => {
           console.error('AOI fetch failed:', err);
+          alert('Error loading data: ' + err.message + '\n\nTrying fallback data...');
           loadStaticGeoJSON();
+        })
+        .finally(() => {
+          // Restore button
+          btn.textContent = originalText;
+          btn.disabled = false;
         });
     });
     

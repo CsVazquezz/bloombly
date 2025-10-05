@@ -1,3 +1,74 @@
+/* Left Sidebar - Dataset Controls */
+#dataset-legend {
+  position: absolute;
+  top: 90px;
+  left: 20px;
+  bottom: 100px;
+  background: transparent;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 11px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  width: 170px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+#datasetColorsLegend {
+  position: absolute;
+  left: 210px;
+  bottom: 100px;
+  background: transparent;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 10px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  width: 140px;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Right Sidebar - Prediction Controls */
+#prediction-legend {
+  position: absolute;
+  top: 90px;
+  right: 20px;
+  bottom: 100px;
+  background: transparent;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 11px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  width: 170px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+#predColorsLegend {
+  position: absolute;
+  right: 210px;
+  bottom: 100px;
+  background: transparent;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 10px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  width: 140px;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Legacy support for old sidebar (keep for backward compatibility) */
 #legend {
   position: absolute;
   top: 90px;
@@ -32,11 +103,15 @@
   justify-content: flex-end;
 }
 
-#colorsLegend * {
+#colorsLegend *,
+#datasetColorsLegend *,
+#predColorsLegend * {
   pointer-events: auto;
 }
 
-#colorsLegend h4 {
+#colorsLegend h4,
+#datasetColorsLegend h4,
+#predColorsLegend h4 {
   margin: 0 0 8px 0;
   font-size: 11px;
   font-weight: 200;
@@ -80,44 +155,62 @@
 }
 
 /* Custom scrollbar for colors legend */
-#colorsLegend::-webkit-scrollbar {
+#colorsLegend::-webkit-scrollbar,
+#datasetColorsLegend::-webkit-scrollbar,
+#predColorsLegend::-webkit-scrollbar {
   width: 4px;
 }
 
-#colorsLegend::-webkit-scrollbar-track {
+#colorsLegend::-webkit-scrollbar-track,
+#datasetColorsLegend::-webkit-scrollbar-track,
+#predColorsLegend::-webkit-scrollbar-track {
   background: #1B1F25;
   border-radius: 2px;
 }
 
-#colorsLegend::-webkit-scrollbar-thumb {
+#colorsLegend::-webkit-scrollbar-thumb,
+#datasetColorsLegend::-webkit-scrollbar-thumb,
+#predColorsLegend::-webkit-scrollbar-thumb {
   background: rgba(78, 217, 217, 0.4);
   border-radius: 2px;
 }
 
-#colorsLegend::-webkit-scrollbar-thumb:hover {
+#colorsLegend::-webkit-scrollbar-thumb:hover,
+#datasetColorsLegend::-webkit-scrollbar-thumb:hover,
+#predColorsLegend::-webkit-scrollbar-thumb:hover {
   background: rgba(78, 217, 217, 0.6);
 }
 
-#legend * {
+#legend *,
+#dataset-legend *,
+#prediction-legend * {
   pointer-events: auto;
 }
 
 /* Custom scrollbar */
-#legend::-webkit-scrollbar {
+#legend::-webkit-scrollbar,
+#dataset-legend::-webkit-scrollbar,
+#prediction-legend::-webkit-scrollbar {
   width: 8px;
 }
 
-#legend::-webkit-scrollbar-track {
+#legend::-webkit-scrollbar-track,
+#dataset-legend::-webkit-scrollbar-track,
+#prediction-legend::-webkit-scrollbar-track {
   background: #1B1F25;
   border-radius: 4px;
 }
 
-#legend::-webkit-scrollbar-thumb {
+#legend::-webkit-scrollbar-thumb,
+#dataset-legend::-webkit-scrollbar-thumb,
+#prediction-legend::-webkit-scrollbar-thumb {
   background: rgba(78, 217, 217, 0.5);
   border-radius: 4px;
 }
 
-#legend::-webkit-scrollbar-thumb:hover {
+#legend::-webkit-scrollbar-thumb:hover,
+#dataset-legend::-webkit-scrollbar-thumb:hover,
+#prediction-legend::-webkit-scrollbar-thumb:hover {
   background: rgba(78, 217, 217, 0.7);
 }
 

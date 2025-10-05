@@ -1,6 +1,17 @@
 from flask import Blueprint, request, jsonify
-import ee
-from earth_engine_utils import get_bloom_data, feature_collection_to_geojson
+import logging
+
+# Try to import Earth Engine utilities, fallback if not available
+try:
+    import ee
+    try:
+        from ..earth_engine_utils import get_bloom_data, feature_collection_to_geojson
+    except ImportError:
+        from earth_engine_utils import get_bloom_data, feature_collection_to_geojson
+    EE_AVAILABLE = True
+except ImportError as e:
+    EE_AVAILABLE = False
+    logging.warning(f"Earth Engine utilities not available: {e}")
 
 data_bp = Blueprint('data', __name__)
 
@@ -56,6 +67,16 @@ def calculate_prediction_summary(features):
 
 @data_bp.route('/blooms', methods=['GET'])
 def get_blooms():
+    """Get bloom data from Earth Engine satellite imagery."""
+    
+    # Check if Earth Engine is available
+    if not EE_AVAILABLE:
+        return jsonify({
+            "error": "Earth Engine not available",
+            "message": "Please use /api/predict/blooms endpoint instead for ML predictions",
+            "suggestion": "Try: /api/predict/blooms?aoi_type=state&aoi_state=Queretaro&date=2025-10-05&method=v2&num_predictions=100"
+        }), 503
+    
     try:
         aoi_type = request.args.get('aoi_type', 'global')
         aoi_country = request.args.get('aoi_country', '')

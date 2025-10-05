@@ -2,14 +2,16 @@ import { CONFIG } from './config.js';
 import { state, initializeFamilyColors } from './state.js';
 import { initGlobe, createPointFromFeature, initializeClouds, switchToPointsMode, loadCountryBorders } from './globe.js';
 import { initTopSelector } from './components/topSelector.js';
-import { initSidebar, createFilterUI, updateLegend } from './components/sidebar.js';
+import { initDatasetSidebar } from './components/datasetSidebar.js';
+import { initPredictionSidebar } from './components/predictionSidebar.js';
 import { initTimeline, buildTimelineSteps } from './components/timeline.js';
 
 // Initialize the application
 async function init() {
   // Initialize components
   initTopSelector();
-  initSidebar();
+  initDatasetSidebar();
+  initPredictionSidebar();
   initTimeline();
   
   // Initialize globe
@@ -19,10 +21,11 @@ async function init() {
   // Load country borders
   await loadCountryBorders();
   
-  // Load data
-  await loadGeoJSONData();
+  // Note: Data is now loaded via sidebar buttons, not automatically
+  console.log('Application initialized. Use sidebars to load data.');
 }
 
+// Legacy function - kept for reference but no longer used on init
 async function loadGeoJSONData() {
   try {
     const datas = await Promise.all(
@@ -52,10 +55,10 @@ async function loadGeoJSONData() {
     // Build timeline
     buildTimelineSteps();
     
-    // Create filter UI
-    createFilterUI();
+    // Create filter UI - now handled by sidebars
+    // createFilterUI();
+    // updateLegend();
     
-    updateLegend();
     switchToPointsMode();
   } catch (error) {
     console.error('Error loading GeoJSON data:', error);

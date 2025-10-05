@@ -977,17 +977,38 @@ class ImprovedBloomPredictor:
                 # Increased samples to get more predictions
                 n_samples = min(100, max(50, num_predictions // len(self.species_bloom_windows) * 2))
                 
-                # Generate random locations within AOI bounds
-                candidate_lats = np.random.uniform(
+                # Generate clustered locations (more natural than pure random)
+                # Create 3-5 cluster centers, then sample around them
+                n_clusters = np.random.randint(3, 6)
+                cluster_centers_lat = np.random.uniform(
                     aoi_bounds['min_lat'], 
                     aoi_bounds['max_lat'], 
-                    n_samples
+                    n_clusters
                 )
-                candidate_lons = np.random.uniform(
+                cluster_centers_lon = np.random.uniform(
                     aoi_bounds['min_lon'], 
                     aoi_bounds['max_lon'], 
-                    n_samples
+                    n_clusters
                 )
+                
+                candidate_lats = []
+                candidate_lons = []
+                samples_per_cluster = n_samples // n_clusters
+                
+                for center_lat, center_lon in zip(cluster_centers_lat, cluster_centers_lon):
+                    # Sample around cluster center with some spread
+                    lat_range = (aoi_bounds['max_lat'] - aoi_bounds['min_lat']) * 0.1
+                    lon_range = (aoi_bounds['max_lon'] - aoi_bounds['min_lon']) * 0.1
+                    
+                    cluster_lats = np.random.normal(center_lat, lat_range * 0.3, samples_per_cluster)
+                    cluster_lons = np.random.normal(center_lon, lon_range * 0.3, samples_per_cluster)
+                    
+                    # Clip to bounds
+                    cluster_lats = np.clip(cluster_lats, aoi_bounds['min_lat'], aoi_bounds['max_lat'])
+                    cluster_lons = np.clip(cluster_lons, aoi_bounds['min_lon'], aoi_bounds['max_lon'])
+                    
+                    candidate_lats.extend(cluster_lats)
+                    candidate_lons.extend(cluster_lons)
                 
                 # Predict for each location
                 for lat, lon in zip(candidate_lats, candidate_lons):
@@ -1025,11 +1046,19 @@ class ImprovedBloomPredictor:
                             "geometry": {
                                 "type": "MultiPolygon",
                                 "coordinates": [[[
-                                    [lon - 0.01, lat - 0.01],
-                                    [lon + 0.01, lat - 0.01],
-                                    [lon + 0.01, lat + 0.01],
-                                    [lon - 0.01, lat + 0.01],
-                                    [lon - 0.01, lat - 0.01]
+                                    # Create variable-sized polygons based on bloom probability and area
+                                    # Higher probability = larger spread
+                                    # Add some randomness to make it look more natural
+                                    [lon - 0.01 * (1 + np.random.uniform(-0.5, 0.5)), 
+                                     lat - 0.01 * (1 + np.random.uniform(-0.5, 0.5))],
+                                    [lon + 0.01 * (1 + np.random.uniform(-0.5, 0.5)), 
+                                     lat - 0.01 * (1 + np.random.uniform(-0.5, 0.5))],
+                                    [lon + 0.01 * (1 + np.random.uniform(-0.5, 0.5)), 
+                                     lat + 0.01 * (1 + np.random.uniform(-0.5, 0.5))],
+                                    [lon - 0.01 * (1 + np.random.uniform(-0.5, 0.5)), 
+                                     lat + 0.01 * (1 + np.random.uniform(-0.5, 0.5))],
+                                    [lon - 0.01 * (1 + np.random.uniform(-0.5, 0.5)), 
+                                     lat - 0.01 * (1 + np.random.uniform(-0.5, 0.5))]
                                 ]]]
                             }
                         }
