@@ -24,39 +24,81 @@ def calculate_area(polygon):
     return area
 
 def create_polygon(points, num_observations):
-    """Create a polygon from points with size based on number of observations"""
+    """Create a simple polygon with minimal coordinates"""
     # Much smaller scale factor for tighter polygons
-    # Example areas range from ~40 km² to ~350,000 km²
     scale = min(1.0 + (num_observations / 20), 3.0)  # Scale 1.0-3.0x
     
     if len(points) == 1:
-        # Single point: create small circle
-        center = Point(points[0][0], points[0][1])
+        # Single point: create a simple square (4 vertices instead of 16)
+        lon, lat = points[0]
         radius = 0.05 * scale  # Base ~5km, up to ~15km
-        return center.buffer(radius, resolution=16)
+        
+        # Square around the point
+        coords = [
+            [lon - radius, lat - radius],
+            [lon + radius, lat - radius],
+            [lon + radius, lat + radius],
+            [lon - radius, lat + radius],
+            [lon - radius, lat - radius]  # Close the polygon
+        ]
+        from shapely.geometry import Polygon
+        return Polygon(coords)
     
     elif len(points) == 2:
-        # Two points: create tight capsule
-        from shapely.geometry import LineString
-        line = LineString(points)
-        width = 0.03 * scale  # Very tight buffer
-        return line.buffer(width, cap_style=1, resolution=16)
+        # Two points: create a simple rectangle/diamond (4-5 vertices)
+        lon1, lat1 = points[0]
+        lon2, lat2 = points[1]
+        
+        width = 0.03 * scale
+        
+        # Calculate perpendicular offset
+        dx = lon2 - lon1
+        dy = lat2 - lat1
+        length = math.sqrt(dx**2 + dy**2)
+        
+        if length < 0.001:  # Points too close, make square
+            radius = 0.05 * scale
+            coords = [
+                [lon1 - radius, lat1 - radius],
+                [lon1 + radius, lat1 - radius],
+                [lon1 + radius, lat1 + radius],
+                [lon1 - radius, lat1 + radius],
+                [lon1 - radius, lat1 - radius]
+            ]
+        else:
+            # Perpendicular vector for width
+            px = -dy / length * width
+            py = dx / length * width
+            
+            # Rectangle around the line
+            coords = [
+                [lon1 + px, lat1 + py],
+                [lon2 + px, lat2 + py],
+                [lon2 - px, lat2 - py],
+                [lon1 - px, lat1 - py],
+                [lon1 + px, lat1 + py]  # Close
+            ]
+        
+        from shapely.geometry import Polygon
+        return Polygon(coords)
     
     else:
-        # Multiple points: create tight hull with minimal buffer
-        # Calculate spread
+        # Multiple points: use simplified convex hull (already minimal vertices)
         lons = [p[0] for p in points]
         lats = [p[1] for p in points]
         spread = math.sqrt((max(lons) - min(lons))**2 + (max(lats) - min(lats))**2)
         
-        # Create convex hull
+        # Create convex hull (naturally minimal vertices)
         hull = MultiPoint(points).convex_hull
         
-        # Very small buffer - just enough to smooth edges
-        buffer_size = 0.02 * scale * (1 + spread * 0.2)  # Much smaller buffer
-        buffered = hull.buffer(buffer_size, cap_style=1, join_style=1, resolution=16)
+        # Small buffer with LOW resolution for fewer vertices
+        buffer_size = 0.02 * scale * (1 + spread * 0.2)
+        buffered = hull.buffer(buffer_size, resolution=3)  # Only 3 segments per corner
         
-        return buffered
+        # Simplify to reduce vertices further
+        simplified = buffered.simplify(0.01, preserve_topology=True)
+        
+        return simplified
 
 # Scan family directories
 for family in os.listdir('../data/jsonl'):
