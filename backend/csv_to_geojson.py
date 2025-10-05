@@ -124,10 +124,10 @@ def csv_to_geojson(csv_file_path):
     return geojson
 
 if __name__ == "__main__":
-    csv_path = "data.csv"
+    csv_path = "../data/csv/data.csv"
     geojson_data = csv_to_geojson(csv_path)
     
-    with open("output.geojson", "w") as f:
+    with open("../data/geojson/output.geojson", "w") as f:
         json.dump(geojson_data, f, indent=2)
     
-    print("GeoJSON file created: output.geojson")
+    print("GeoJSON file created: ../data/geojson/output.geojson")
