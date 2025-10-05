@@ -62,8 +62,121 @@ def get_aoi_bounds(aoi_type, aoi_state, aoi_country, bbox):
         return {'min_lon': bbox[0], 'min_lat': bbox[1], 'max_lon': bbox[2], 'max_lat': bbox[3]}
     return None
 
+def calculate_prediction_summary(features):
+    """Calculate summary statistics for prediction results."""
+    if not features:
+        return {
+            "total_predictions": 0,
+            "species_count": 0,
+            "families": {},
+            "seasons": {},
+            "average_probability": 0.0,
+            "probability_range": {"min": 0.0, "max": 0.0},
+            "total_area": 0,
+            "environmental_summary": {}
+        }
+    
+    # Extract data from features
+    species = set()
+    families = {}
+    seasons = {}
+    probabilities = []
+    total_area = 0
+    env_temps = []
+    env_precip = []
+    env_ndvi = []
+    
+    for feature in features:
+        props = feature.get('properties', {})
+        
+        # Count species and families
+        site = props.get('Site')
+        family = props.get('Family')
+        season = props.get('Season')
+        
+        if site:
+            species.add(site)
+        
+        if family:
+            families[family] = families.get(family, 0) + 1
+        
+        if season:
+            seasons[season] = seasons.get(season, 0) + 1
+        
+        # Probability statistics
+        prob = props.get('bloom_probability')
+        if prob is not None:
+            probabilities.append(prob)
+        
+        # Area
+        area = props.get('Area', 0)
+        total_area += area
+        
+        # Environmental factors
+        env_factors = props.get('environmental_factors', {})
+        if env_factors:
+            temp = env_factors.get('temperature')
+            precip = env_factors.get('precipitation')
+            ndvi = env_factors.get('ndvi')
+            
+            if temp is not None:
+                env_temps.append(temp)
+            if precip is not None:
+                env_precip.append(precip)
+            if ndvi is not None:
+                env_ndvi.append(ndvi)
+    
+    # Calculate statistics
+    summary = {
+        "total_predictions": len(features),
+        "species_count": len(species),
+        "families": families,
+        "family_count": len(families),
+        "seasons": seasons,
+        "total_area": round(total_area, 2)
+    }
+    
+    # Probability statistics
+    if probabilities:
+        summary["average_probability"] = round(sum(probabilities) / len(probabilities), 3)
+        summary["probability_range"] = {
+            "min": round(min(probabilities), 3),
+            "max": round(max(probabilities), 3)
+        }
+        summary["high_confidence_count"] = sum(1 for p in probabilities if p >= 0.7)
+        summary["medium_confidence_count"] = sum(1 for p in probabilities if 0.4 <= p < 0.7)
+        summary["low_confidence_count"] = sum(1 for p in probabilities if p < 0.4)
+    
+    # Environmental summary
+    env_summary = {}
+    if env_temps:
+        env_summary["temperature"] = {
+            "avg": round(sum(env_temps) / len(env_temps), 1),
+            "min": round(min(env_temps), 1),
+            "max": round(max(env_temps), 1)
+        }
+    if env_precip:
+        env_summary["precipitation"] = {
+            "avg": round(sum(env_precip) / len(env_precip), 1),
+            "total": round(sum(env_precip), 1)
+        }
+    if env_ndvi:
+        env_summary["vegetation_index"] = {
+            "avg": round(sum(env_ndvi) / len(env_ndvi), 3),
+            "min": round(min(env_ndvi), 3),
+            "max": round(max(env_ndvi), 3)
+        }
+    
+    summary["environmental_summary"] = env_summary
+    
+    return summary
+
 def create_geojson_response(features, metadata):
     """Creates a GeoJSON FeatureCollection response."""
+    # Calculate summary statistics
+    summary = calculate_prediction_summary(features)
+    metadata["summary"] = summary
+    
     return jsonify({
         "type": "FeatureCollection",
         "features": features,
