@@ -201,8 +201,9 @@ def predict_blooms():
         confidence_threshold = float(request.args.get('confidence', '0.3'))
         num_predictions = int(request.args.get('num_predictions', '200'))  # Increased default from 100 to 200
 
-        if query_params.date:
-            target_date = query_params.date
+        # Handle single date prediction - either via 'date' or just 'start_date' without 'end_date'
+        if query_params.date or (query_params.start_date and not query_params.end_date):
+            target_date = query_params.date if query_params.date else query_params.start_date
             
             if version == 'v2':
                 # Use improved bloom dynamics model
@@ -221,7 +222,7 @@ def predict_blooms():
                 model_info = "Enhanced ML model with environmental factors (v1)"
             
             metadata = {
-                "prediction_date": query_params.date.isoformat(),
+                "prediction_date": target_date.isoformat(),
                 "aoi_type": query_params.aoi_type,
                 "prediction_type": "single_date",
                 "method": query_params.method,
@@ -239,11 +240,35 @@ def predict_blooms():
             if (end_date - start_date).days > config.MAX_TIME_SERIES_DAYS:
                 end_date = start_date + timedelta(days=config.MAX_TIME_SERIES_DAYS)
 
-            predictions = predictor.predict_blooms_time_series(
-                start_date, end_date, aoi_bounds, config.TIME_SERIES_INTERVAL_DAYS
-            )
+            # Generate time series predictions
+            # Note: v2 predictor doesn't have predict_blooms_time_series, so we implement it here
+            predictions = {}
+            current_date = start_date
+            while current_date <= end_date:
+                if version == 'v2':
+                    daily_predictions = predictor.predict_blooms_for_date(
+                        current_date, 
+                        aoi_bounds, 
+                        num_predictions=num_predictions,
+                        confidence_threshold=confidence_threshold
+                    )
+                elif query_params.method == 'statistical':
+                    daily_predictions = predictor.predict_blooms_statistical(current_date, aoi_bounds, config.NUM_PREDICTIONS)
+                else:
+                    daily_predictions = predictor.predict_blooms_enhanced(current_date, aoi_bounds, config.NUM_PREDICTIONS)
+                
+                predictions[current_date.strftime('%Y-%m-%d')] = daily_predictions
+                current_date += timedelta(days=config.TIME_SERIES_INTERVAL_DAYS)
             
-            all_features = [feature for date in predictions for feature in predictions[date]]
+            all_features = [feature for date_key in predictions for feature in predictions[date_key]]
+            
+            # Determine model info based on version and method
+            if version == 'v2':
+                model_info = "ML model trained on bloom dynamics with temporal features and environmental factors (v2)"
+            elif query_params.method == 'enhanced':
+                model_info = "Enhanced ML model with environmental factors (v1)"
+            else:
+                model_info = "Statistical sampling from historical data"
             
             metadata = {
                 "start_date": query_params.start_date.isoformat(),
@@ -252,12 +277,15 @@ def predict_blooms():
                 "prediction_type": "time_series",
                 "interval_days": config.TIME_SERIES_INTERVAL_DAYS,
                 "method": query_params.method,
-                "model_info": "Enhanced ML model with environmental factors" if query_params.method == 'enhanced' else "Statistical sampling from historical data"
+                "model_version": version,
+                "confidence_threshold": confidence_threshold if version == 'v2' else None,
+                "num_predictions": num_predictions if version == 'v2' else None,
+                "model_info": model_info
             }
             return create_geojson_response(all_features, metadata)
 
         else:
-            return jsonify(error="Must provide either 'date' or both 'start_date' and 'end_date'"), 400
+            return jsonify(error="Must provide 'date' for single-date prediction, or 'start_date' (optionally with 'end_date' for time series)"), 400
 
     except Exception as e:
         import traceback
