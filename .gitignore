@@ -165,3 +165,4 @@ infrastructure/terraform/.terraform.lock.hcl
 
 # Generated files
 staticwebapp.config.json.backup
+data/geojson/combined_predictions_2024.geojson

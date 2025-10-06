@@ -1,0 +1,94 @@
+{
+  "validation_date": "2025-10-05T11:00:41.356974",
+  "ground_truth": {
+    "total_observations": 58,
+    "date_range": "Day 5 - Day 124"
+  },
+  "ml_model": {
+    "metrics": {
+      "matches_found": 8,
+      "total_predictions": 17,
+      "mean_absolute_error": 5.75,
+      "median_error": 5.5,
+      "std_error": 4.235268586524354,
+      "max_error": 12.0,
+      "min_error": 1.0,
+      "rmse": 7.14142842854285,
+      "within_7_days": 50.0,
+      "within_14_days": 100.0
+    },
+    "matches": [
+      {
+        "location": "Tokyo",
+        "predicted": 90,
+        "actual": 89.0,
+        "error_days": 1.0,
+        "distance_deg": 0.01414213562374321
+      },
+      {
+        "location": "Kyoto",
+        "predicted": 90,
+        "actual": 89.0,
+        "error_days": 1.0,
+        "distance_deg": 0.014142135623723113
+      },
+      {
+        "location": "Osaka",
+        "predicted": 79,
+        "actual": 90.0,
+        "error_days": 11.0,
+        "distance_deg": 0.01414213562374321
+      },
+      {
+        "location": "Hiroshima",
+        "predicted": 77,
+        "actual": 85.0,
+        "error_days": 8.0,
+        "distance_deg": 0.014142135623723113
+      },
+      {
+        "location": "Fukuoka",
+        "predicted": 75,
+        "actual": 87.0,
+        "error_days": 12.0,
+        "distance_deg": 0.01414213562374321
+      },
+      {
+        "location": "Sendai",
+        "predicted": 90,
+        "actual": 93.0,
+        "error_days": 3.0,
+        "distance_deg": 0.01414213562374321
+      },
+      {
+        "location": "Nagoya",
+        "predicted": 90,
+        "actual": 88.0,
+        "error_days": 2.0,
+        "distance_deg": 0.01414213562374321
+      },
+      {
+        "location": "Sapporo",
+        "predicted": 117,
+        "actual": 109.0,
+        "error_days": 8.0,
+        "distance_deg": 0.014142135623723113
+      }
+    ]
+  },
+  "kaggle": {
+    "metrics": {
+      "matches_found": 87,
+      "sample_size": 87,
+      "mean_absolute_error": 3.9080459770114944,
+      "median_error": 3.0,
+      "std_error": 3.5057659694236403,
+      "max_error": 20.0,
+      "min_error": 0.0,
+      "rmse": 5.250068417726058,
+      "within_7_days": 87.35632183908046,
+      "within_14_days": 97.70114942528735
+    },
+    "sample_size": 87
+  }
+}
