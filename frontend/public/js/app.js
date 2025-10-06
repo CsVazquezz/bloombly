@@ -6,6 +6,7 @@ import { initUnifiedSidebar } from './components/unifiedSidebar.js';
 import { initTimeline, buildTimelineSteps } from './components/timeline.js';
 import { initDescriptionCard } from './components/descriptionCard.js';
 import { initMetricsCard } from './components/metricsCard.js';
+import { initAdvancedFilters } from './components/advancedFilters.js';
 
 // Initialize the application
 async function init() {
@@ -15,6 +16,7 @@ async function init() {
   initTimeline();
   initDescriptionCard();
   initMetricsCard();
+  initAdvancedFilters();
   
   // Initialize globe
   initGlobe();

@@ -8,10 +8,6 @@ export function initMetricsCard() {
   
   // Build the static HTML structure once
   container.innerHTML = `
-    <div class="metrics-header">
-      <h3>Bloom Metrics</h3>
-    </div>
-    
     <div class="metrics-content">
       <div class="metric-item">
         <div>

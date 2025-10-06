@@ -1,31 +1,28 @@
-/* Description Card - Right Side Panel */
-#description-card {
+/* Description Card - Bottom of Right Column */
+.description-card {
   position: fixed;
-  top: 260px;
-  right: 20px;
-  width: 280px;
-  max-width: calc(100vw - 40px); /* Ensure it doesn't overflow viewport */
+  top: 420px;
+  right: 30px;
+  width: 310px;
+  height: 400px;
   background: transparent;
-  backdrop-filter: none;
   border: none;
   border-radius: 12px;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
+  padding: 12px;
   box-shadow: none;
+  backdrop-filter: none;
   z-index: 1000;
+  display: none;
   opacity: 0;
-  transform: translateX(20px);
+  transform: translateY(20px);
   transition: opacity 0.3s ease, transform 0.3s ease;
-  pointer-events: auto;
-  gap: 10px;
-  box-sizing: border-box; /* Include padding in width calculation */
-  overflow: hidden; /* Prevent content from overflowing */
+  overflow: hidden;
 }
 
-#description-card.visible {
+.description-card.visible {
+  display: block !important;
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
 }
 
 /* Card Header */
@@ -34,14 +31,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 0;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   border-bottom: none;
   background: transparent;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 200;
   color: #4ED9D9;
   letter-spacing: 2px;
@@ -77,41 +74,41 @@
   transform: scale(0.95);
 }
 
-/* Card Content */
+/* Card Content Layout */
 .card-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
+  padding: 0 4px 4px 4px;
+  height: calc(100% - 50px);
   overflow-y: auto;
-  overflow-x: hidden; /* Prevent horizontal overflow */
-  max-height: calc(100vh - 320px);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 /* Genus Image Container */
 .genus-image-container {
-  width: 100%;
-  box-sizing: border-box;
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
-  background: rgba(18, 20, 24, 0.7);
+  gap: 4px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
-  padding: 12px;
-  border: none;
+  padding: 8px;
 }
 
 .genus-image {
   width: 100%;
   max-width: 100%;
-  height: auto;
+  height: 180px;
+  object-fit: contain;
   border-radius: 8px;
   transition: transform 0.3s ease;
+  flex-shrink: 0;
 }
 
 .genus-image:hover {
-  transform: scale(1.02);
+  transform: scale(1.05);
 }
 
 /* Custom scrollbar for card content */
@@ -137,7 +134,7 @@
 .info-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 /* Taxonomy Section (Family & Genus) */
@@ -150,8 +147,8 @@
 
 .taxonomy-row {
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 4px;
   flex-wrap: wrap; /* Allow wrapping if needed */
   width: 100%;
   box-sizing: border-box;
@@ -162,7 +159,7 @@
   min-width: 0; /* Allow flex items to shrink below content size */
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 /* Physical Data Section */
@@ -175,7 +172,7 @@
 
 .data-row {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   flex-wrap: wrap;
   width: 100%;
   box-sizing: border-box;
@@ -184,15 +181,15 @@
 .data-item {
   flex: 1;
   min-width: 60px;
-  max-width: calc(50% - 6px); /* Ensure items don't get too wide */
+  max-width: calc(50% - 3px); /* Ensure items don't get too wide */
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   box-sizing: border-box;
 }
 
 .info-section h4 {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   font-size: 11px;
   font-weight: 200;
   color: #FFFFFF;
@@ -223,7 +220,7 @@
 
 /* Labels and Values - Plain Display */
 .label {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 200;
   letter-spacing: 0.5px;
@@ -231,7 +228,7 @@
 }
 
 .value {
-  font-size: 13px;
+  font-size: 11px;
   color: #FFFFFF;
   font-weight: 400;
   text-align: left;
@@ -300,10 +297,14 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  #description-card {
-    width: calc(100vw - 40px);
-    max-width: 280px;
-    right: 20px;
+  .description-card {
+    max-width: 360px;
+    width: calc(100% - 40px);
+    left: 20px;
+    right: auto;
+    top: auto;
+    bottom: 20px;
+    height: 300px;
   }
 }
 

@@ -106,7 +106,35 @@ export function applyTimelineFilter() {
   
   const currentStep = state.timelineSteps[state.currentTimelineIndex];
   
-  state.filteredFeatures = state.geojsonFeatures.filter(feature => {
+  // Start with all features
+  let baseFeatures = state.geojsonFeatures;
+  
+  // Apply location filter if active
+  if (state.locationFilteredFeatures !== null && state.locationFilteredFeatures.length >= 0) {
+    baseFeatures = state.locationFilteredFeatures;
+    console.log(`[Timeline] Using location-filtered features: ${baseFeatures.length}`);
+  }
+  
+  // Apply area filter if active (intersect with location filter if both exist)
+  if (state.areaFilteredFeatures !== null && state.areaFilteredFeatures.length >= 0) {
+    if (state.locationFilteredFeatures !== null && state.locationFilteredFeatures.length >= 0) {
+      // Both filters active - intersect them
+      // Create unique IDs for features to match
+      const locationIds = new Set(state.locationFilteredFeatures.map(f => 
+        `${f.properties.Genus}_${f.properties.Family}_${f.properties.year}_${f.properties.Season}_${f.properties.Area}`
+      ));
+      baseFeatures = state.areaFilteredFeatures.filter(f => 
+        locationIds.has(`${f.properties.Genus}_${f.properties.Family}_${f.properties.year}_${f.properties.Season}_${f.properties.Area}`)
+      );
+      console.log(`[Timeline] Intersecting location and area filters: ${baseFeatures.length}`);
+    } else {
+      baseFeatures = state.areaFilteredFeatures;
+      console.log(`[Timeline] Using area-filtered features: ${baseFeatures.length}`);
+    }
+  }
+  
+  // Now apply timeline, family, and genus filters on top
+  state.filteredFeatures = baseFeatures.filter(feature => {
     const matchesTimeline = feature.properties.year === currentStep.year && 
                             feature.properties.Season === currentStep.season;
     
@@ -118,17 +146,19 @@ export function applyTimelineFilter() {
     return matchesTimeline && matchesFamily && matchesGenus;
   });
   
-  state.filteredPoints = state.pointsData.filter(point => {
-    const matchesTimeline = point.year === currentStep.year && 
-                           point.Season === currentStep.season;
-    
-    const matchesFamily = state.selectedFamilies.size === 0 || 
-                         state.selectedFamilies.has(point.Family);
-    const matchesGenus = state.selectedGenus.size === 0 || 
-                        state.selectedGenus.has(point.Genus);
-    
-    return matchesTimeline && matchesFamily && matchesGenus;
-  });
+  console.log(`[Timeline] After timeline/family/genus filters: ${state.filteredFeatures.length} features`);
+  
+  // Create a set of IDs from filtered features to filter points
+  const featureIds = new Set(state.filteredFeatures.map(f => 
+    `${f.properties.Genus}_${f.properties.Family}_${f.properties.year}_${f.properties.Season}_${f.properties.Area}`
+  ));
+  
+  // Filter points to match the filtered features, but always include user location
+  state.filteredPoints = state.pointsData.filter(point => 
+    point.isUserLocation || featureIds.has(`${point.Genus}_${point.Family}_${point.year}_${point.Season}_${point.Area}`)
+  );
+  
+  console.log(`[Timeline] Final filtered points: ${state.filteredPoints.length}`);
   
   if (state.currentDisplayMode === DISPLAY_MODE.HEX) {
     switchToHexMode();

@@ -1,47 +1,32 @@
-/* Metrics Card - Always Visible at Top Right */
+/* Metrics Card - Top of Right Column */
 #metrics-card {
   position: fixed;
-  top: 40px;
+  top: 20px;
   right: 20px;
-  width: 280px;
+  width: 360px;
   background: transparent;
   border: none;
   border-radius: 12px;
-  padding: 16px 18px;
+  padding: 12px 14px;
   display: none;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   z-index: 999;
   pointer-events: auto;
-}
-
-.metrics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.metrics-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 200;
-  color: #4ED9D9;
-  letter-spacing: 2px;
-  text-transform: uppercase;
+  box-sizing: border-box;
 }
 
 .metrics-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .metric-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: rgba(18, 20, 24, 0.7);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -55,24 +40,25 @@
 
 .metric-label {
   font-size: 11px;
-  color: #FFFFFF;
-  font-weight: 200;
+  color: #4ED9D9;
+  font-weight: 600;
   letter-spacing: 0.5px;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  text-transform: uppercase;
 }
 
 .metric-sublabel {
-  font-size: 9px;
+  font-size: 8px;
   color: rgba(255, 255, 255, 0.6);
   font-weight: 200;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .metric-value-container {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 2px;
 }
 
 .metric-count {
@@ -115,6 +101,8 @@
 @media (max-width: 768px) {
   #metrics-card {
     width: calc(100% - 40px);
-    max-width: 280px;
+    max-width: 360px;
+    left: 20px;
+    right: auto;
   }
 }

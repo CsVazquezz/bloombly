@@ -52,6 +52,11 @@ export function getGlobe() {
 }
 
 export function getColorForFeature(feature) {
+  // Special case for user location marker
+  if (feature.isUserLocation) {
+    return '#4ED9D9'; // Bright cyan color for user location
+  }
+  
   if (state.currentColorMode === COLOR_MODE.FAMILY) {
     // In Family mode, all genera in the same family show the same family color
     const color = state.familyColors[feature.Family] || CONFIG.DEFAULT_COLOR;
@@ -68,6 +73,13 @@ export function getColorForFeature(feature) {
 }
 
 export function calculatePointRadius(point) {
+  // Special case for user location marker - make it smaller but still distinctive with pulsating effect
+  if (point.isUserLocation) {
+    const baseRadius = 0.7;
+    const pulseScale = 1 + 0.4 * Math.sin(Date.now() * 0.005); // Pulsating effect
+    return baseRadius * pulseScale;
+  }
+  
   return point.Area * CONFIG.POINT_AREA_SCALE + CONFIG.POINT_BASE_RADIUS;
 }
 
@@ -358,3 +370,93 @@ export function toggleCountryBorders(show) {
   }
 }
 
+// User location marker
+let userLocationMarker = null;
+
+export function setUserLocationMarker(lat, lng) {
+  if (!globe) return;
+  
+  console.log(`[User Location Marker] Setting marker at lat: ${lat}, lng: ${lng}`);
+  
+  // Remove existing marker if any
+  removeUserLocationMarker();
+  
+  // Create a user location point object
+  const userLocationPoint = {
+    lat: lat,
+    lng: lng,
+    isUserLocation: true,
+    Site: 'Your Location',
+    Family: 'User',
+    Genus: 'Location'
+  };
+  
+  // Add to state.pointsData so it's included in filters
+  if (!state.pointsData.some(point => point.isUserLocation)) {
+    state.pointsData.push(userLocationPoint);
+  }
+  
+  // Re-apply timeline filter to include the user location
+  import('./components/timeline.js').then(module => {
+    module.applyTimelineFilter();
+  });
+  
+  console.log(`[User Location Marker] User location added to state.pointsData`);
+  
+  // Focus camera on user location
+  globe.pointOfView({ lat, lng, altitude: 2 }, 1000);
+  
+  // Store reference for removal
+  userLocationMarker = userLocationPoint;
+  
+  // Start pulsating animation
+  startUserLocationAnimation();
+}
+
+export function removeUserLocationMarker() {
+  if (!globe || !userLocationMarker) return;
+  
+  // Stop the animation
+  stopUserLocationAnimation();
+  
+  // Remove from state.pointsData
+  state.pointsData = state.pointsData.filter(point => !point.isUserLocation);
+  
+  // Re-apply timeline filter to update the display
+  import('./components/timeline.js').then(module => {
+    module.applyTimelineFilter();
+  });
+  
+  console.log('[User Location Marker] User location removed from state.pointsData');
+  userLocationMarker = null;
+}
+
+// Animation variables
+let userLocationAnimationId = null;
+
+function startUserLocationAnimation() {
+  if (userLocationAnimationId) return; // Already animating
+  
+  function animate() {
+    if (!userLocationMarker || !globe) {
+      userLocationAnimationId = null;
+      return;
+    }
+    
+    // Trigger a re-render of points to show the pulsating effect
+    if (state.currentDisplayMode === DISPLAY_MODE.POINTS) {
+      globe.pointsData(state.filteredPoints); // Use filteredPoints from state
+    }
+    
+    userLocationAnimationId = requestAnimationFrame(animate);
+  }
+  
+  userLocationAnimationId = requestAnimationFrame(animate);
+}
+
+function stopUserLocationAnimation() {
+  if (userLocationAnimationId) {
+    cancelAnimationFrame(userLocationAnimationId);
+    userLocationAnimationId = null;
+  }
+}

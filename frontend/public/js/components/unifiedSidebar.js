@@ -489,6 +489,7 @@ async function loadDatasetData() {
     const { createPointFromFeature, switchToPointsMode } = await import('../globe.js');
     const { initializeFamilyColors } = await import('../state.js');
     const { buildTimelineSteps } = await import('./timeline.js');
+    const { showAdvancedFilters } = await import('./advancedFilters.js');
     
     state.geojsonFeatures = allFeatures;
     state.pointsData = allFeatures.map(createPointFromFeature);
@@ -514,6 +515,9 @@ async function loadDatasetData() {
     // Show and update metrics card
     showMetricsCard();
     updateMetrics();
+    
+    // Show advanced filters card
+    showAdvancedFilters();
     
     btn.textContent = 'Loaded ✓';
     btn.classList.remove('loading');
@@ -630,6 +634,7 @@ async function fetchPredictionData() {
     const { createPointFromFeature, switchToPointsMode } = await import('../globe.js');
     const { initializeFamilyColors } = await import('../state.js');
     const { buildTimelineSteps } = await import('./timeline.js');
+    const { showAdvancedFilters } = await import('./advancedFilters.js');
     
     state.geojsonFeatures = allFeatures;
     state.pointsData = allFeatures.map(createPointFromFeature);
@@ -652,6 +657,9 @@ async function fetchPredictionData() {
     // Show and update metrics card
     showMetricsCard();
     updateMetrics();
+    
+    // Show advanced filters card
+    showAdvancedFilters();
     
     btn.textContent = 'Loaded ✓';
     btn.classList.remove('loading');

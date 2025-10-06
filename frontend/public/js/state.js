@@ -131,7 +131,9 @@ export const state = {
   filteredPoints: [],
   familyColors: {},
   genusColors: {},
-  familyToColorScale: {} // Maps family name to color scale name
+  familyToColorScale: {}, // Maps family name to color scale name
+  locationFilteredFeatures: null, // Features filtered by location
+  areaFilteredFeatures: null // Features filtered by area
 };
 
 // Color generation functions

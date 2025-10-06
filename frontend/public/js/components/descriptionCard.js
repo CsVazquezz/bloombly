@@ -5,13 +5,17 @@ let currentPoint = null;
 export function initDescriptionCard() {
   const container = document.createElement('div');
   container.id = 'description-card';
+  container.className = 'description-card';
   container.style.display = 'none';
   document.body.appendChild(container);
+  console.log('[Description Card] Initialized with ID and class "description-card"');
 }
 
 export function showDescriptionCard(point, event, coords) {
   currentPoint = point;
   const card = document.getElementById('description-card');
+  
+  console.log('[Description Card] showDescriptionCard called', { point, card });
   
   if (!card) {
     console.error('Description card not initialized');
@@ -84,11 +88,14 @@ export function showDescriptionCard(point, event, coords) {
   `;
   
   // Show the card with animation
-  card.style.display = 'flex';
+  card.style.display = 'block';
+  
+  console.log('[Description Card] Card display set to block, adding visible class');
   
   // Use setTimeout to trigger animation after display is set
   setTimeout(() => {
     card.classList.add('visible');
+    console.log('[Description Card] Visible class added, card should be shown');
   }, 10);
   
   // Attach close button event
